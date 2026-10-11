@@ -1,0 +1,20 @@
+{
+ "name": "Interiors by JanLee",
+ "short_name": "JanLee",
+ "start_url": "/",
+ "display": "standalone",
+ "background_color": "#F7F2EA",
+ "theme_color": "#F7F2EA",
+ "icons": [
+  {
+   "src": "/apple-touch-icon.png",
+   "sizes": "180x180",
+   "type": "image/png"
+  },
+  {
+   "src": "/assets/img/brand/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  }
+ ]
+}

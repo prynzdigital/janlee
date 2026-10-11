@@ -1,0 +1,12 @@
+# Original full-size photos downloaded from Houzz (127 MB backup; optimized copies live in site/assets/img)
+_source/raw/
+
+# Local editor / preview config
+.claude/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+node_modules/
