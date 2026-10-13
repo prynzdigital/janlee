@@ -208,7 +208,7 @@
       form.reset(); updateCount();
       $$('[aria-invalid]', form).forEach(f => f.removeAttribute('aria-invalid'));
       $$('.field-err', form).forEach(s => { s.textContent = ''; });
-      say('ok', 'Thank you! Your message has been sent — we’ll be in touch within 1 business day.');
+      say('ok', 'Thank you! Your message has been sent. A confirmation is on its way to your inbox, and JanLee will contact you within 1 business day.');
     };
     let sending = false;
 
@@ -235,6 +235,8 @@
       // send only known fields, cleaned and length-capped
       const data = {
         _subject: raw._subject, _template: raw._template, _captcha: raw._captcha, _blacklist: raw._blacklist, _honey: '',
+        // confirmation email to the visitor; only sent once their address has passed validation above
+        _autoresponse: raw._autoresponse,
         name: clean(raw.name).slice(0, 80),
         email: clean(raw.email).slice(0, 254),
         phone: clean(raw.phone).slice(0, 20),

@@ -561,6 +561,7 @@ ${pageHero('Contact', 'Start Your Project Today', 'Questions? Ideas? Drop us a l
     <input type="hidden" name="_subject" value="New website inquiry — Interiors by JanLee">
     <input type="hidden" name="_template" value="table">
     <input type="hidden" name="_captcha" value="false">
+    <input type="hidden" name="_autoresponse" value="${esc(site.autoresponse)}">
     <input type="hidden" name="_blacklist" value="casino, crypto, bitcoin, viagra, loan offer, seo services, backlinks, forex">
     <p class="hp" aria-hidden="true"><label>Leave this field empty<input type="text" name="_honey" tabindex="-1" autocomplete="off"></label></p>
     <div class="form-row">
