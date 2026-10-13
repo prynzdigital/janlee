@@ -5,6 +5,7 @@
   'use strict';
   const CFG = window.CRM_CONFIG || {};
   const DEMO = !CFG.supabaseUrl || !CFG.supabaseAnonKey;
+  const IG = CFG.instagram || 'https://www.instagram.com/interiorsbyjanlee/';
   const $ = (s, c = document) => c.querySelector(s);
   const $$ = (s, c = document) => [...c.querySelectorAll(s)];
   const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -22,7 +23,7 @@
     { id: 'on_hold', label: 'On hold' }, { id: 'completed', label: 'Completed' },
   ];
   const pLabel = id => PSTATUS.find(s => s.id === id)?.label || id;
-  const SOURCES = [['website', 'Website'], ['referral', 'Referral'], ['phone', 'Phone call'], ['email', 'Email'], ['social', 'Social media'], ['repeat', 'Repeat client'], ['other', 'Other']];
+  const SOURCES = [['website', 'Website'], ['referral', 'Referral'], ['phone', 'Phone call'], ['email', 'Email'], ['social', 'Instagram / social'], ['repeat', 'Repeat client'], ['other', 'Other']];
   const srcLabel = id => (SOURCES.find(s => s[0] === id) || [, id])[1];
   const PTYPES = ['Interior design & decorating', 'Kitchen renovation', 'Bathroom renovation', 'Whole-home remodel', 'Color consultation', 'Furniture selection / repurposing', 'Commercial space', 'Something else'];
   const KINDS = [['note', 'Note'], ['call', 'Call'], ['email', 'Email'], ['meeting', 'Meeting']];
@@ -40,7 +41,8 @@
     note: '<path d="M7 4h13l5 5v19H7z"/><path d="M20 4v5h5M11 15h10M11 20h10"/>', meet: '<rect x="4" y="6" width="24" height="22" rx="2"/><path d="M4 12h24M10 3v6M22 3v6"/>',
     stage: '<path d="M5 16h18M17 9l7 7-7 7"/>', alert: '<path d="M16 4 2 28h28z"/><path d="M16 13v7M16 24v.5"/>', clock: '<circle cx="16" cy="16" r="12"/><path d="M16 9v7l5 3"/>',
     check: '<path d="m7 16 6 6 12-13"/>', out: '<path d="M13 6H6v20h7M20 10l6 6-6 6M26 16H12"/>', site: '<circle cx="16" cy="16" r="12"/><path d="M4 16h24M16 4c4 4 4 20 0 24M16 4c-4 4-4 20 0 24"/>',
-    dl: '<path d="M16 4v16M9 13l7 7 7-7M5 26h22"/>', star: '<path d="m16 3 3.9 8.4 9.1 1-6.8 6.2 1.9 9-8.1-4.6-8.1 4.6 1.9-9L3 12.4l9.1-1z"/>',
+    dl: '<path d="M16 4v16M9 13l7 7 7-7M5 26h22"/>',
+    ig: '<rect x="4" y="4" width="24" height="24" rx="7"/><circle cx="16" cy="16" r="5.5"/><circle cx="23" cy="9" r="1.2" fill="currentColor" stroke="none"/>', star: '<path d="m16 3 3.9 8.4 9.1 1-6.8 6.2 1.9 9-8.1-4.6-8.1 4.6 1.9-9L3 12.4l9.1-1z"/>',
   };
   const icon = (n, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n] || ''}</svg>`;
 
@@ -317,6 +319,7 @@
         <div class="side-foot">
           <a href="#" data-action="export">${icon('dl')} Export leads (CSV)</a>
           <a href="/" target="_blank" rel="noopener">${icon('site')} View website</a>
+          <a href="${esc(IG)}" target="_blank" rel="noopener">${icon('ig')} Instagram</a>
           ${DEMO ? `<a href="#" data-action="reset-demo">${icon('star')} Reset demo data</a>` : `<a href="#" data-action="signout">${icon('out')} Sign out</a>`}
           <span>${DEMO ? 'Demo mode' : esc(auth.s?.email || '')}</span>
         </div>
@@ -324,6 +327,7 @@
       <div>
         ${DEMO ? '<div class="demo-banner"><strong>Demo mode</strong> — sample data stored only in this browser. Connect Supabase to use real data.</div>' : ''}
         <header class="topbar"><a class="mini-brand" href="#/dashboard"><span>Interiors by</span>JanLee</a>
+          <a class="icon-btn" href="${esc(IG)}" target="_blank" rel="noopener" aria-label="Instagram (opens in a new tab)">${icon('ig')}</a>
           <button class="btn btn-primary btn-sm" type="button" data-action="new-lead">${icon('plus')} Lead</button>
           <button class="icon-btn" type="button" data-action="${DEMO ? 'reset-demo' : 'signout'}" aria-label="${DEMO ? 'Reset demo data' : 'Sign out'}">${icon(DEMO ? 'star' : 'out')}</button>
         </header>

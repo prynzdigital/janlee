@@ -6,4 +6,5 @@ window.CRM_CONFIG = {
   supabaseUrl: '',      // e.g. 'https://abcd1234.supabase.co'
   supabaseAnonKey: '',  // the "anon public" key
   adminEmail: 'interiorsbyjanlee@gmail.com',
+  instagram: 'https://www.instagram.com/interiorsbyjanlee/',
 };

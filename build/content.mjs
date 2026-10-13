@@ -5,6 +5,8 @@ export const site = {
   url: 'https://interiorsbyjanlee.com',
   phone: '(719) 930-5245',
   phoneHref: 'tel:+17199305245',
+  instagram: 'https://www.instagram.com/interiorsbyjanlee/',
+  instagramHandle: '@interiorsbyjanlee',
   email: 'interiorsbyjanlee@gmail.com',
   city: 'Colorado Springs',
   region: 'CO',

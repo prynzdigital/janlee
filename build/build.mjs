@@ -50,6 +50,7 @@ const I = {
   store: '<path d="M4 12 6 5h20l2 7M4 12a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0M6 15v13h20V15M13 28v-7h6v7"/>',
   arrow: '<path d="M5 16h22M19 8l8 8-8 8"/>',
   arrowL: '<path d="M27 16H5M13 8l-8 8 8 8"/>',
+  instagram: '<rect x="4" y="4" width="24" height="24" rx="7"/><circle cx="16" cy="16" r="5.5"/><circle cx="23" cy="9" r="1.2" fill="currentColor" stroke="none"/>',
   phone: '<path d="M8 4h4l2 6-3 2a15 15 0 0 0 9 9l2-3 6 2v4a3 3 0 0 1-3 3A23 23 0 0 1 5 7a3 3 0 0 1 3-3Z"/>',
   mail: '<rect x="4" y="7" width="24" height="18" rx="2"/><path d="m4 9 12 8 12-8"/>',
   pin: '<path d="M16 29s9-8.4 9-15a9 9 0 0 0-18 0c0 6.6 9 15 9 15Z"/><circle cx="16" cy="14" r="3.2"/>',
@@ -79,6 +80,7 @@ const ldBusiness = {
   address: { '@type': 'PostalAddress', addressLocality: site.city, addressRegion: site.region, addressCountry: 'US' },
   geo: { '@type': 'GeoCoordinates', latitude: 38.8339, longitude: -104.8214 },
   areaServed: { '@type': 'City', name: 'Colorado Springs' },
+  sameAs: [site.instagram],
   award: badges.map(y => `Best of Houzz ${y} — Client Satisfaction`),
   knowsAbout: ['Interior design', 'Kitchen remodeling', 'Bathroom remodeling', 'Home renovation', 'Color consultation', 'Furniture repurposing', 'Space planning'],
   hasOfferCatalog: { '@type': 'OfferCatalog', name: 'Interior design services', itemListElement: services.map(s => ({ '@type': 'Offer', itemOffered: { '@type': 'Service', name: s.title } })) },
@@ -131,13 +133,14 @@ ${[ldBusiness, ...ld].map(o => `<script type="application/ld+json">${JSON.string
   <a href="mailto:${site.email}">${icon('mail')} ${site.email}</a>
   <a href="${site.phoneHref}">${icon('phone')} ${site.phone}</a>
   <span class="topbar-award">${icon('calendar')} Designing Colorado homes since ${site.founded}</span>
+  <a class="topbar-social" href="${site.instagram}" target="_blank" rel="noopener" aria-label="Interiors by JanLee on Instagram (opens in a new tab)">${icon('instagram')} ${site.instagramHandle}</a>
 </div></div>
 <header class="header" id="top"><div class="wrap header-in">
   ${logo()}
   <nav class="nav" id="nav" aria-label="Main">
     <ul>${navHtml}</ul>
     <a class="btn btn-dark nav-cta-mobile" href="/contact/">Book a Consultation</a>
-    <p class="nav-contact"><a href="${site.phoneHref}">${site.phone}</a><a href="mailto:${site.email}">${site.email}</a></p>
+    <p class="nav-contact"><a href="${site.phoneHref}">${site.phone}</a><a href="mailto:${site.email}">${site.email}</a><a href="${site.instagram}" target="_blank" rel="noopener">Instagram ${site.instagramHandle}</a></p>
   </nav>
   <a class="btn btn-dark header-cta" href="/contact/">Book a Consultation</a>
   <a class="icon-btn header-call" href="${site.phoneHref}" aria-label="Call ${site.phone}">${icon('phone')}</a>
@@ -163,6 +166,7 @@ function footer() {
     <div class="footer-brand">
       ${logo('logo-light')}
       <p>Creating uniquely beautiful, functional and personal homes in Colorado Springs since ${site.founded}. Restoring the old while embracing the new.</p>
+      <a class="footer-social" href="${site.instagram}" target="_blank" rel="noopener" aria-label="Follow Interiors by JanLee on Instagram (opens in a new tab)">${icon('instagram')}<span>Follow on Instagram</span></a>
       <div class="footer-badges">${badges.slice(0, 4).map(y => `<img src="/assets/img/badges/best-of-houzz-${y}.png" width="56" height="56" alt="Best of Houzz ${y} — Client Satisfaction" loading="lazy">`).join('')}</div>
     </div>
     <div><h2 class="footer-h">Explore</h2><ul class="footer-links">${nav.map(([h, t]) => `<li><a href="${h}">${t}</a></li>`).join('')}</ul></div>
@@ -172,6 +176,7 @@ function footer() {
         <li>${icon('pin')}<span>${site.city}, Colorado</span></li>
         <li>${icon('phone')}<a href="${site.phoneHref}">${site.phone}</a></li>
         <li>${icon('mail')}<a href="mailto:${site.email}">${site.email}</a></li>
+        <li>${icon('instagram')}<a href="${site.instagram}" target="_blank" rel="noopener">${site.instagramHandle}</a></li>
       </ul>
       <a class="link-arrow link-gold" href="/contact/">Book a Consultation ${icon('arrow')}</a>
     </div>
@@ -553,6 +558,7 @@ ${pageHero('Contact', 'Start Your Project Today', 'Questions? Ideas? Drop us a l
     <ul class="contact-list">
       <li><span class="ci">${icon('phone')}</span><span><small>Call</small><a href="${site.phoneHref}">${site.phone}</a></span></li>
       <li><span class="ci">${icon('mail')}</span><span><small>Email</small><a href="mailto:${site.email}">${site.email}</a></span></li>
+      <li><span class="ci">${icon('instagram')}</span><span><small>Instagram</small><a href="${site.instagram}" target="_blank" rel="noopener">${site.instagramHandle}</a></span></li>
       <li><span class="ci">${icon('pin')}</span><span><small>Studio</small>${site.city}, Colorado</span></li>
     </ul>
     <div class="map"><iframe title="Map of Colorado Springs, CO" src="https://www.google.com/maps?q=Colorado+Springs,+CO&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
@@ -598,6 +604,7 @@ pages['/thank-you/'] = layout({
   <h1 class="h1">Thank You!</h1>
   <p class="lead">Your consultation request has been sent to JanLee. A confirmation email is on its way to your inbox — if you don’t see it in a few minutes, please check your spam or promotions folder.</p>
   <p class="lead">JanLee will personally contact you within <strong>1 business day</strong>. Need us sooner? Call <a href="${site.phoneHref}">${site.phone}</a>.</p>
+  <p class="lead">In the meantime, follow along for fresh inspiration on <a href="${site.instagram}" target="_blank" rel="noopener">Instagram ${site.instagramHandle}</a>.</p>
   <div class="btn-row center-row"><a class="btn btn-dark" href="/our-work/">Browse Our Work ${icon('arrow')}</a><a class="btn btn-outline" href="/">Back to Home</a></div>
 </div></section>`,
 }).replace('<meta name="robots" content="index, follow, max-image-preview:large">', '<meta name="robots" content="noindex">');
