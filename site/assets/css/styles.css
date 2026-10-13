@@ -622,3 +622,13 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .form .hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 .form button[disabled] { opacity: .6; cursor: progress; }
 .form-status a { color: inherit; font-weight: 500; }
+
+/* ---------- form validation feedback ---------- */
+.field-err { display: block; min-height: 0; color: #A63D2F; font-size: .82rem; font-weight: 500; line-height: 1.35; }
+.field-err:empty { display: none; }
+.field-meta { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.field-count { margin-left: auto; color: var(--muted); font-size: .78rem; font-weight: 400; white-space: nowrap; }
+.field-count.is-near { color: #A63D2F; font-weight: 500; }
+.form [aria-invalid="false"]:not([type=checkbox]):not(:placeholder-shown) { border-color: #9BAA8F; }
+.form input::placeholder { color: #A39A8E; }
+.form .check + .field-err { margin-top: -8px; }

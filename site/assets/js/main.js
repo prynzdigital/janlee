@@ -134,45 +134,141 @@
     });
   }
 
-  // Contact form
+  // Contact form — client-side validation + anti-spam. FormSubmit has no server-side rules,
+  // so these checks stop honest mistakes and casual bots; the hidden _blacklist and honeypot help on their side.
   const form = $('#contact-form');
   if (form) {
     const status = $('.form-status', form);
+    const btn = $('button[type=submit]', form);
+    const msg = form.elements.message, count = $('#msg-count', form);
+    const loadedAt = Date.now();
+    const LIMIT = { cooldownMs: 60e3, perHour: 3 };
+    const store = {
+      get() { try { return JSON.parse(localStorage.getItem('jl-form') || '[]'); } catch { return []; } },
+      add(t) { try { localStorage.setItem('jl-form', JSON.stringify([...this.get(), t].slice(-10))); } catch {} },
+    };
+    // strip control characters / invisible formatting chars, collapse runs of spaces
+    const clean = (v, multiline) => String(v || '')
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F​-‏‪-‮⁠-⁤﻿]/g, '')
+      .replace(multiline ? /[ \t]{2,}/g : /\s+/g, ' ').trim();
+    const linkCount = v => (v.match(/https?:\/\/|www\.|\[url|<a\s/gi) || []).length;
+    const EMAIL = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/;
+    const rules = {
+      name: v => !v ? 'Please enter your name.'
+        : v.length < 2 ? 'Name must be at least 2 characters.'
+        : v.length > 80 ? 'Name must be 80 characters or fewer.'
+        : !/^[\p{L}][\p{L}\p{M} .,'’\-]*$/u.test(v) ? 'Please use letters only (spaces, hyphens and apostrophes are fine).' : '',
+      email: v => !v ? 'Please enter your email address.'
+        : v.length > 254 ? 'Email address is too long.'
+        : !EMAIL.test(v) || /\.\./.test(v) ? 'Please enter a valid email address, e.g. name@example.com.' : '',
+      phone: v => {
+        const d = v.replace(/\D/g, '');
+        if (!v) return 'Please enter your phone number.';
+        if (/[^\d\s().+\-]/.test(v)) return 'Phone numbers can contain digits, spaces, ( ) + and - only.';
+        if (d.length < 10 || d.length > 15) return 'Please enter a full phone number, including area code (10–15 digits).';
+        return '';
+      },
+      zip: v => v && !/^\d{5}(-\d{4})?$/.test(v) ? 'Zip code should be 5 digits (or ZIP+4).' : '',
+      message: v => !v ? 'Please tell us a little about your project.'
+        : v.length < 10 ? `Please add a bit more detail (at least 10 characters — ${10 - v.length} to go).`
+        : v.length > 2000 ? `Please shorten your message to 2,000 characters (currently ${v.length.toLocaleString()}).`
+        : linkCount(v) > 2 ? 'Please include no more than 2 links in your message.' : '',
+      consent: (_, el) => el.checked ? '' : 'Please tick the box so we can reply to you.',
+    };
+    const value = el => el.type === 'checkbox' ? el.checked : clean(el.value, el.name === 'message');
+    const check = name => {
+      const el = form.elements[name];
+      const err = rules[name](value(el), el);
+      el.setAttribute('aria-invalid', err ? 'true' : 'false');
+      const slot = $('#err-' + name, form);
+      if (slot) slot.textContent = err;
+      return err;
+    };
+    // live feedback: counter while typing, field errors once a field has been left
+    const updateCount = () => {
+      const n = msg.value.length;
+      count.textContent = `${n.toLocaleString()} / 2,000`;
+      count.classList.toggle('is-near', n > 1800);
+    };
+    msg.addEventListener('input', updateCount); updateCount();
+    Object.keys(rules).forEach(name => {
+      const el = form.elements[name];
+      el.addEventListener('blur', () => { if (el.type !== 'checkbox' && el.value) check(name); });
+      el.addEventListener(el.type === 'checkbox' ? 'change' : 'input', () => { if (el.getAttribute('aria-invalid') === 'true') check(name); });
+    });
+    // tidy US numbers on blur: 7199305245 -> (719) 930-5245
+    form.elements.phone.addEventListener('blur', e => {
+      const d = e.target.value.replace(/\D/g, '');
+      if (d.length === 10) e.target.value = `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+    });
+
+    const say = (cls, html) => { status.className = 'form-status ' + cls; status.innerHTML = html; };
+    const fallback = `Please email <a href="mailto:${form.dataset.email}">${form.dataset.email}</a> or call <a href="${form.dataset.tel}">${form.dataset.phone}</a>.`;
+    const thanks = () => {
+      form.reset(); updateCount();
+      $$('[aria-invalid]', form).forEach(f => f.removeAttribute('aria-invalid'));
+      $$('.field-err', form).forEach(s => { s.textContent = ''; });
+      say('ok', 'Thank you! Your message has been sent — we’ll be in touch within 1 business day.');
+    };
+    let sending = false;
+
     form.addEventListener('submit', async e => {
       e.preventDefault();
-      let bad = null;
-      $$('[required]', form).forEach(f => {
-        const ok = f.type === 'checkbox' ? f.checked : f.checkValidity() && f.value.trim();
-        f.setAttribute('aria-invalid', !ok); if (!ok && !bad) bad = f;
-      });
-      if (bad) { status.className = 'form-status err'; status.textContent = 'Please complete the highlighted fields.'; bad.focus(); return; }
-      const data = Object.fromEntries(new FormData(form));
-      const thanks = () => { form.reset(); status.className = 'form-status ok'; status.textContent = 'Thank you! Your message has been sent — we’ll be in touch within 1 business day.'; };
-      if (data._honey) return thanks(); // bot filled the hidden trap field: drop silently
-      const mailto = () => {
-        const body = `Name: ${data.name}\nEmail: ${data.email}\nPhone: ${data.phone}\nZip: ${data.zip || ''}\nProject: ${data.project}\n\n${data.message}`;
-        location.href = `mailto:${form.dataset.email}?subject=${encodeURIComponent('Design consultation request — ' + data.name)}&body=${encodeURIComponent(body)}`;
+      if (sending) return;
+      const errors = Object.keys(rules).map(n => [n, check(n)]).filter(([, er]) => er);
+      if (errors.length) {
+        say('err', errors.length === 1 ? errors[0][1] : `Please fix the ${errors.length} highlighted fields.`);
+        form.elements[errors[0][0]].focus();
+        return;
+      }
+      const raw = Object.fromEntries(new FormData(form));
+      // bots: filled the hidden field, or submitted faster than a person could type
+      if (raw._honey || Date.now() - loadedAt < 3000) return thanks();
+      // per-browser rate limit
+      const now = Date.now(), recent = store.get().filter(t => now - t < 3600e3);
+      const last = recent[recent.length - 1];
+      if (last && now - last < LIMIT.cooldownMs) {
+        return say('err', `Your message was just sent. Please wait ${Math.ceil((LIMIT.cooldownMs - (now - last)) / 1000)} seconds before sending another.`);
+      }
+      if (recent.length >= LIMIT.perHour) return say('err', `You’ve reached the message limit for now. ${fallback}`);
+
+      // send only known fields, cleaned and length-capped
+      const data = {
+        _subject: raw._subject, _template: raw._template, _captcha: raw._captcha, _blacklist: raw._blacklist, _honey: '',
+        name: clean(raw.name).slice(0, 80),
+        email: clean(raw.email).slice(0, 254),
+        phone: clean(raw.phone).slice(0, 20),
+        zip: clean(raw.zip).slice(0, 10),
+        project: clean(raw.project).slice(0, 60),
+        message: clean(raw.message, true).slice(0, 2000),
+        consent: 'Yes — agreed to be contacted',
       };
       const endpoint = form.dataset.endpoint;
-      if (!endpoint) { mailto(); status.className = 'form-status ok'; status.textContent = 'Opening your email app to send your message…'; return; }
-      const btn = $('button[type=submit]', form);
-      btn.disabled = true; status.className = 'form-status'; status.textContent = 'Sending…';
+      if (!endpoint) {
+        const body = `Name: ${data.name}\nEmail: ${data.email}\nPhone: ${data.phone}\nZip: ${data.zip}\nProject: ${data.project}\n\n${data.message}`;
+        location.href = `mailto:${form.dataset.email}?subject=${encodeURIComponent('Design consultation request — ' + data.name)}&body=${encodeURIComponent(body)}`;
+        return say('ok', 'Opening your email app to send your message…');
+      }
+      sending = true; btn.disabled = true; say('', 'Sending…');
+      const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 15000);
       try {
-        const r = await fetch(endpoint, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+        const r = await fetch(endpoint, {
+          method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify(data), signal: ctrl.signal, credentials: 'omit', referrerPolicy: 'strict-origin',
+        });
         const j = await r.json().catch(() => ({}));
         // FormSubmit answers 200 with success "true"/"false"; only treat an explicit success as sent
         if (!r.ok || String(j.success) !== 'true') throw new Error(j.message || `HTTP ${r.status}`);
+        store.add(Date.now());
         thanks();
       } catch (err) {
         // the service's reason (e.g. "This form needs Activation…") is logged for troubleshooting
         console.warn('[contact form] not delivered:', err && err.message);
-        const activation = /activat/i.test(err && err.message || '');
-        status.className = 'form-status err';
-        status.innerHTML = (activation
-          ? 'Our contact form is being activated and your message couldn’t be delivered yet. '
-          : 'Sorry, your message couldn’t be sent. ')
-          + `Please email <a href="mailto:${form.dataset.email}">${form.dataset.email}</a> or call <a href="${form.dataset.tel}">${form.dataset.phone}</a>.`;
-      } finally { btn.disabled = false; }
+        const reason = (err && err.message) || '';
+        say('err', (/activat/i.test(reason) ? 'Our contact form is being activated and your message couldn’t be delivered yet. '
+          : err && err.name === 'AbortError' ? 'The connection timed out. '
+          : 'Sorry, your message couldn’t be sent. ') + fallback);
+      } finally { clearTimeout(timer); sending = false; btn.disabled = false; }
     });
   }
 })();

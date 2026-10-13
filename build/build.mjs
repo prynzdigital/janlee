@@ -561,19 +561,20 @@ ${pageHero('Contact', 'Start Your Project Today', 'Questions? Ideas? Drop us a l
     <input type="hidden" name="_subject" value="New website inquiry — Interiors by JanLee">
     <input type="hidden" name="_template" value="table">
     <input type="hidden" name="_captcha" value="false">
+    <input type="hidden" name="_blacklist" value="casino, crypto, bitcoin, viagra, loan offer, seo services, backlinks, forex">
     <p class="hp" aria-hidden="true"><label>Leave this field empty<input type="text" name="_honey" tabindex="-1" autocomplete="off"></label></p>
     <div class="form-row">
-      <label><span class="lbl">Name <span aria-hidden="true">*</span></span><input name="name" autocomplete="name" required></label>
-      <label><span class="lbl">Email <span aria-hidden="true">*</span></span><input name="email" type="email" autocomplete="email" required></label>
+      <label><span class="lbl">Name <span aria-hidden="true">*</span></span><input name="name" autocomplete="name" required minlength="2" maxlength="80" aria-describedby="err-name"><small class="field-err" id="err-name"></small></label>
+      <label><span class="lbl">Email <span aria-hidden="true">*</span></span><input name="email" type="email" autocomplete="email" inputmode="email" required maxlength="254" spellcheck="false" aria-describedby="err-email"><small class="field-err" id="err-email"></small></label>
     </div>
     <div class="form-row">
-      <label><span class="lbl">Phone <span aria-hidden="true">*</span></span><input name="phone" type="tel" autocomplete="tel" required></label>
-      <label><span class="lbl">Zip code</span><input name="zip" inputmode="numeric" autocomplete="postal-code"></label>
+      <label><span class="lbl">Phone <span aria-hidden="true">*</span></span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required maxlength="20" placeholder="(719) 555-0123" aria-describedby="err-phone"><small class="field-err" id="err-phone"></small></label>
+      <label><span class="lbl">Zip code</span><input name="zip" inputmode="numeric" autocomplete="postal-code" maxlength="10" aria-describedby="err-zip"><small class="field-err" id="err-zip"></small></label>
     </div>
     <label><span class="lbl">Project type</span><select name="project">${opts.map(o => `<option>${o}</option>`).join('')}</select></label>
-    <label><span class="lbl">Tell us about your project <span aria-hidden="true">*</span></span><textarea name="message" rows="5" required></textarea></label>
+    <label><span class="lbl">Tell us about your project <span aria-hidden="true">*</span></span><textarea name="message" rows="5" required minlength="10" maxlength="2000" aria-describedby="err-message msg-count"></textarea><span class="field-meta"><small class="field-err" id="err-message"></small><small class="field-count" id="msg-count" aria-live="polite">0 / 2000</small></span></label>
     <p class="form-note">We care about your privacy. Please don’t submit sensitive information such as social security numbers, credit card or bank information.</p>
-    <label class="check"><input type="checkbox" name="consent" required> <span>I agree that Interiors by JanLee can email and call me in response to my inquiry.</span></label>
+    <label class="check"><input type="checkbox" name="consent" required aria-describedby="err-consent"> <span>I agree that Interiors by JanLee can email and call me in response to my inquiry.</span></label><small class="field-err" id="err-consent"></small>
     <button class="btn btn-dark btn-block" type="submit">Send Message ${icon('arrow')}</button>
     <p class="form-status" role="status" aria-live="polite"></p>
   </form>
