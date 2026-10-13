@@ -18,6 +18,7 @@ const YEARS = YEAR - site.founded;
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const paras = s => s.split(/\n{2,}/).map(p => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
 const houzzSlug = s => s.toLowerCase().replace(/'/g, '-').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const initials = n => { const w = n.split(/\s+/).filter(x => /^[A-Z]/.test(x)); return ((w[0] || n)[0] + (w.length > 1 ? w[w.length - 1][0] : '')).toUpperCase(); };
 const catLabel = id => categories.find(c => c.id === id)?.label ?? '';
 
 const projects = data.projects.map(p => {
@@ -129,7 +130,7 @@ ${[ldBusiness, ...ld].map(o => `<script type="application/ld+json">${JSON.string
   <span>${icon('pin')} ${site.city}, ${site.region}</span>
   <a href="mailto:${site.email}">${icon('mail')} ${site.email}</a>
   <a href="${site.phoneHref}">${icon('phone')} ${site.phone}</a>
-  <span class="topbar-award">${icon('award')} Best of Houzz · Client Satisfaction 2015–2024</span>
+  <span class="topbar-award">${icon('calendar')} Designing Colorado homes since ${site.founded}</span>
 </div></div>
 <header class="header" id="top"><div class="wrap header-in">
   ${logo()}
@@ -195,7 +196,7 @@ function reviewCard(r, { clamp = true } = {}) {
   <div class="review-top"><span class="q" aria-hidden="true">“</span>${stars(r.rating)}</div>
   <blockquote class="review-body">${paras(r.body)}</blockquote>
   ${clamp && long ? '<button class="review-more" type="button" aria-expanded="false">Read more</button>' : ''}
-  <figcaption><span class="avatar" aria-hidden="true">${esc(r.name.split(/\s+/).map(w => w[0]).slice(0, 2).join(''))}</span><span><strong>${esc(r.name)}</strong><small>Houzz review${r.date ? ' · ' + r.date.slice(0, 4) : ''}</small></span></figcaption>
+  <figcaption><span class="avatar" aria-hidden="true">${esc(initials(r.name))}</span><span><strong>${esc(r.name)}</strong><small>Houzz review${r.date ? ' · ' + r.date.slice(0, 4) : ''}</small></span></figcaption>
 </figure>`;
 }
 
@@ -286,8 +287,8 @@ const pages = {};
         <a class="btn btn-outline" href="/contact/">Book a Consultation</a>
       </div>
       <div class="trust">
-        <div class="trust-badges">${badges.slice(0, 3).map(y => `<img src="/assets/img/badges/best-of-houzz-${y}.png" width="44" height="44" alt="Best of Houzz ${y}">`).join('')}</div>
-        <p>${stars()} <strong>5.0</strong> · ${reviews.length} reviews<br><span>8× Best of Houzz · Client Satisfaction</span></p>
+        <div class="trust-avatars" aria-hidden="true">${[2174704, 1992714, 1865471, 1928631].map(id => reviews.find(r => r.id === id)).filter(Boolean).map(r => `<span>${esc(initials(r.name))}</span>`).join('')}</div>
+        <p>${stars()} <strong>5.0</strong> · ${reviews.length} five-star reviews<br><span>Trusted by Colorado Springs homeowners since ${site.founded}</span></p>
       </div>
     </div>
   </div>

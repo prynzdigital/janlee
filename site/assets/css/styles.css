@@ -634,3 +634,11 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .form .check + .field-err { margin-top: -8px; }
 .ty-mark { display: inline-grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--cream); color: var(--gold-text); margin-bottom: 18px; }
 .ty-mark .ic { width: 36px; height: 36px; }
+/* hero trust row: reviewer initials (replaces dated award badges) */
+.trust-avatars { display: flex; }
+.trust-avatars span { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font: 500 .95rem/1 var(--serif); letter-spacing: .03em; color: #fff; box-shadow: 0 0 0 3px var(--cream); }
+.trust-avatars span + span { margin-left: -10px; }
+.trust-avatars span:nth-child(1) { background: var(--sage); }
+.trust-avatars span:nth-child(2) { background: var(--gold); }
+.trust-avatars span:nth-child(3) { background: var(--sage-deep); }
+.trust-avatars span:nth-child(4) { background: #9A7B5B; }
