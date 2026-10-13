@@ -1,0 +1,15 @@
+{
+  "name": "JanLee Studio CRM",
+  "short_name": "JanLee CRM",
+  "description": "Leads, tasks, clients and projects for Interiors by JanLee.",
+  "start_url": "/admin/",
+  "scope": "/admin/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F0E8",
+  "theme_color": "#1A1C18",
+  "icons": [
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/assets/img/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

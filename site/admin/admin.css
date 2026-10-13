@@ -434,3 +434,21 @@ button.row:hover, a.row:hover { background: var(--surface-2); }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 @media (max-width: 480px) { .welcome .hide-sm { display: none; } .welcome .btn { min-height: 40px; padding: 0 16px; } }
+
+/* ---------- app-like phone layout: docked, stable bottom menu ---------- */
+html, body { overscroll-behavior: none; }            /* no rubber-band bounce dragging the UI around */
+body { -webkit-tap-highlight-color: transparent; }
+@media (max-width: 959px) {
+  .shell { padding-bottom: calc(66px + env(safe-area-inset-bottom)); }
+  .tabbar {
+    left: 0; right: 0; bottom: 0; border-radius: 0; padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    background: var(--night); backdrop-filter: none; -webkit-backdrop-filter: none;
+    box-shadow: 0 -1px 0 rgba(255,255,255,.06), 0 -10px 30px -18px rgba(0,0,0,.5);
+    transform: translateZ(0); will-change: transform;  /* own layer: no jitter while scrolling */
+  }
+  .tabbar a { border-radius: 12px; }
+  .toasts { bottom: calc(78px + env(safe-area-inset-bottom)); }
+  .topbar { padding-top: calc(10px + env(safe-area-inset-top)); }
+}
+/* installed to home screen: respect the notch/status bar */
+@media (display-mode: standalone) { .demo-banner { padding-top: calc(7px + env(safe-area-inset-top)); } }
