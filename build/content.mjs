@@ -11,7 +11,7 @@ export const site = {
   founded: 2011,
   // Contact form delivery via FormSubmit (free, no account). The first submission triggers a one-time
   // "Activate form" email to this inbox; submissions are delivered after it is clicked.
-  formEndpoint: 'https://formsubmit.co/ajax/interiorsbyjanlee@gmail.com',
+  formEndpoint: 'https://formsubmit.co/interiorsbyjanlee@gmail.com',
   // Automatic confirmation emailed to the visitor (FormSubmit _autoresponse; plain text)
   autoresponse: 'Thank you for reaching out to Interiors by JanLee! We have received your consultation request, and JanLee will personally contact you within 1 business day to talk about your project. If you have anything to add in the meantime, simply reply to this email or call (719) 930-5245. We look forward to helping you create a home you love. Warmly, JanLee | Interiors by JanLee | Colorado Springs, CO | interiorsbyjanlee.com',
 };

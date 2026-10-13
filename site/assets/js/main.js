@@ -134,7 +134,7 @@
     });
   }
 
-  // Contact form — client-side validation + anti-spam. FormSubmit has no server-side rules,
+  // Contact form — client-side validation + anti-spam before a standard POST to FormSubmit. FormSubmit has no server-side rules,
   // so these checks stop honest mistakes and casual bots; the hidden _blacklist and honeypot help on their side.
   const form = $('#contact-form');
   if (form) {
@@ -232,45 +232,31 @@
       }
       if (recent.length >= LIMIT.perHour) return say('err', `You’ve reached the message limit for now. ${fallback}`);
 
-      // send only known fields, cleaned and length-capped
-      const data = {
-        _subject: raw._subject, _template: raw._template, _captcha: raw._captcha, _blacklist: raw._blacklist, _honey: '',
-        // confirmation email to the visitor; only sent once their address has passed validation above
-        _autoresponse: raw._autoresponse,
-        name: clean(raw.name).slice(0, 80),
-        email: clean(raw.email).slice(0, 254),
-        phone: clean(raw.phone).slice(0, 20),
-        zip: clean(raw.zip).slice(0, 10),
-        project: clean(raw.project).slice(0, 60),
-        message: clean(raw.message, true).slice(0, 2000),
-        consent: 'Yes — agreed to be contacted',
-      };
-      const endpoint = form.dataset.endpoint;
-      if (!endpoint) {
-        const body = `Name: ${data.name}\nEmail: ${data.email}\nPhone: ${data.phone}\nZip: ${data.zip}\nProject: ${data.project}\n\n${data.message}`;
-        location.href = `mailto:${form.dataset.email}?subject=${encodeURIComponent('Design consultation request — ' + data.name)}&body=${encodeURIComponent(body)}`;
+      // write cleaned, length-capped values back so the native POST only carries tidy data
+      [['name', 80], ['email', 254], ['phone', 20], ['zip', 10], ['message', 2000]].forEach(([n, max]) => {
+        const el = form.elements[n]; el.value = clean(el.value, n === 'message').slice(0, max);
+      });
+      // FormSubmit returns the visitor to our thank-you page on whatever domain they're on
+      form.elements._next.value = `${location.origin}/thank-you/`;
+      form.elements._url.value = location.href;
+      if (!form.action) {
+        const body = `Name: ${raw.name}
+Email: ${raw.email}
+Phone: ${raw.phone}
+Zip: ${raw.zip || ''}
+Project: ${raw.project}
+
+${raw.message}`;
+        location.href = `mailto:${form.dataset.email}?subject=${encodeURIComponent('Design consultation request — ' + raw.name)}&body=${encodeURIComponent(body)}`;
         return say('ok', 'Opening your email app to send your message…');
       }
-      sending = true; btn.disabled = true; say('', 'Sending…');
-      const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 15000);
-      try {
-        const r = await fetch(endpoint, {
-          method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-          body: JSON.stringify(data), signal: ctrl.signal, credentials: 'omit', referrerPolicy: 'strict-origin',
-        });
-        const j = await r.json().catch(() => ({}));
-        // FormSubmit answers 200 with success "true"/"false"; only treat an explicit success as sent
-        if (!r.ok || String(j.success) !== 'true') throw new Error(j.message || `HTTP ${r.status}`);
-        store.add(Date.now());
-        thanks();
-      } catch (err) {
-        // the service's reason (e.g. "This form needs Activation…") is logged for troubleshooting
-        console.warn('[contact form] not delivered:', err && err.message);
-        const reason = (err && err.message) || '';
-        say('err', (/activat/i.test(reason) ? 'Our contact form is being activated and your message couldn’t be delivered yet. '
-          : err && err.name === 'AbortError' ? 'The connection timed out. '
-          : 'Sorry, your message couldn’t be sent. ') + fallback);
-      } finally { clearTimeout(timer); sending = false; btn.disabled = false; }
+      // Standard (non-AJAX) submit: FormSubmit only sends the visitor's confirmation email (_autoresponse)
+      // for regular posts that pass its reCAPTCHA step, which then redirects to /thank-you/.
+      sending = true; btn.disabled = true; store.add(Date.now());
+      say('', 'Sending… you’ll see a quick “I’m not a robot” check, then a confirmation page.');
+      HTMLFormElement.prototype.submit.call(form);
+      // if the browser stays on the page (offline, blocked), re-enable after a while
+      setTimeout(() => { sending = false; btn.disabled = false; }, 15000);
     });
   }
 })();

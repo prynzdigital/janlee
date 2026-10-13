@@ -556,11 +556,12 @@ ${pageHero('Contact', 'Start Your Project Today', 'Questions? Ideas? Drop us a l
     </ul>
     <div class="map"><iframe title="Map of Colorado Springs, CO" src="https://www.google.com/maps?q=Colorado+Springs,+CO&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
   </div>
-  <form class="form" id="contact-form" data-endpoint="${esc(site.formEndpoint)}" data-email="${site.email}" data-tel="${site.phoneHref}" data-phone="${site.phone}" novalidate>
+  <form class="form" id="contact-form" action="${esc(site.formEndpoint)}" method="POST" accept-charset="UTF-8" data-email="${site.email}" data-tel="${site.phoneHref}" data-phone="${site.phone}" novalidate>
     <h2 class="h3">Schedule Your Consultation</h2>
     <input type="hidden" name="_subject" value="New website inquiry — Interiors by JanLee">
     <input type="hidden" name="_template" value="table">
-    <input type="hidden" name="_captcha" value="false">
+    <input type="hidden" name="_next" value="${site.url}/thank-you/">
+    <input type="hidden" name="_url" value="${site.url}/contact/">
     <input type="hidden" name="_autoresponse" value="${esc(site.autoresponse)}">
     <input type="hidden" name="_blacklist" value="casino, crypto, bitcoin, viagra, loan offer, seo services, backlinks, forex">
     <p class="hp" aria-hidden="true"><label>Leave this field empty<input type="text" name="_honey" tabindex="-1" autocomplete="off"></label></p>
@@ -575,7 +576,7 @@ ${pageHero('Contact', 'Start Your Project Today', 'Questions? Ideas? Drop us a l
     <label><span class="lbl">Project type</span><select name="project">${opts.map(o => `<option>${o}</option>`).join('')}</select></label>
     <label><span class="lbl">Tell us about your project <span aria-hidden="true">*</span></span><textarea name="message" rows="5" required minlength="10" maxlength="2000" aria-describedby="err-message msg-count"></textarea><span class="field-meta"><small class="field-err" id="err-message"></small><small class="field-count" id="msg-count" aria-live="polite">0 / 2000</small></span></label>
     <p class="form-note">We care about your privacy. Please don’t submit sensitive information such as social security numbers, credit card or bank information.</p>
-    <label class="check"><input type="checkbox" name="consent" required aria-describedby="err-consent"> <span>I agree that Interiors by JanLee can email and call me in response to my inquiry.</span></label><small class="field-err" id="err-consent"></small>
+    <label class="check"><input type="checkbox" name="consent" value="Yes — agreed to be contacted" required aria-describedby="err-consent"> <span>I agree that Interiors by JanLee can email and call me in response to my inquiry.</span></label><small class="field-err" id="err-consent"></small>
     <button class="btn btn-dark btn-block" type="submit">Send Message ${icon('arrow')}</button>
     <p class="form-status" role="status" aria-live="polite"></p>
   </form>
@@ -586,6 +587,19 @@ ${pageHero('Contact', 'Start Your Project Today', 'Questions? Ideas? Drop us a l
     url: '/contact/', body, ld: [breadcrumb([['/', 'Home'], ['/contact/', 'Contact']])],
   });
 }
+
+// THANK YOU (FormSubmit redirects here after a successful submission)
+pages['/thank-you/'] = layout({
+  title: 'Request Received | Interiors by JanLee', description: 'Thank you for contacting Interiors by JanLee.', url: '/thank-you/',
+  body: `<section class="section"><div class="wrap narrow center">
+  <span class="ty-mark" aria-hidden="true">${icon('check', 'ic')}</span>
+  <p class="eyebrow">Request received</p>
+  <h1 class="h1">Thank You!</h1>
+  <p class="lead">Your consultation request has been sent to JanLee. A confirmation email is on its way to your inbox — if you don’t see it in a few minutes, please check your spam or promotions folder.</p>
+  <p class="lead">JanLee will personally contact you within <strong>1 business day</strong>. Need us sooner? Call <a href="${site.phoneHref}">${site.phone}</a>.</p>
+  <div class="btn-row center-row"><a class="btn btn-dark" href="/our-work/">Browse Our Work ${icon('arrow')}</a><a class="btn btn-outline" href="/">Back to Home</a></div>
+</div></section>`,
+}).replace('<meta name="robots" content="index, follow, max-image-preview:large">', '<meta name="robots" content="noindex">');
 
 // PRIVACY
 pages['/privacy/'] = layout({
@@ -616,7 +630,7 @@ fs.writeFileSync(path.join(OUT, '404.html'), notFound);
 const today = new Date().toISOString().slice(0, 10);
 fs.writeFileSync(path.join(OUT, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
-${Object.keys(pages).filter(u => u !== '/privacy/').map(u => {
+${Object.keys(pages).filter(u => u !== '/privacy/' && u !== '/thank-you/').map(u => {
   const p = projects.find(x => x.url === u);
   const imgs = p ? p.photos.slice(0, 20).map(ph => `<image:image><image:loc>${site.url}/assets/img/projects/${p.slug}/${ph.name}.webp</image:loc></image:image>`).join('') : '';
   return `<url><loc>${site.url}${u}</loc><lastmod>${today}</lastmod><priority>${u === '/' ? '1.0' : p ? '0.7' : '0.8'}</priority>${imgs}</url>`;

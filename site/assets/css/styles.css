@@ -632,3 +632,5 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .form [aria-invalid="false"]:not([type=checkbox]):not(:placeholder-shown) { border-color: #9BAA8F; }
 .form input::placeholder { color: #A39A8E; }
 .form .check + .field-err { margin-top: -8px; }
+.ty-mark { display: inline-grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--cream); color: var(--gold-text); margin-bottom: 18px; }
+.ty-mark .ic { width: 36px; height: 36px; }
