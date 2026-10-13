@@ -42,6 +42,16 @@
     stage: '<path d="M5 16h18M17 9l7 7-7 7"/>', alert: '<path d="M16 4 2 28h28z"/><path d="M16 13v7M16 24v.5"/>', clock: '<circle cx="16" cy="16" r="12"/><path d="M16 9v7l5 3"/>',
     check: '<path d="m7 16 6 6 12-13"/>', out: '<path d="M13 6H6v20h7M20 10l6 6-6 6M26 16H12"/>', site: '<circle cx="16" cy="16" r="12"/><path d="M4 16h24M16 4c4 4 4 20 0 24M16 4c-4 4-4 20 0 24"/>',
     dl: '<path d="M16 4v16M9 13l7 7 7-7M5 26h22"/>',
+    search: '<circle cx="14" cy="14" r="9"/><path d="m21 21 7 7"/>',
+    list: '<path d="M11 8h16M11 16h16M11 24h16M5 8h.01M5 16h.01M5 24h.01"/>',
+    money: '<rect x="3" y="8" width="26" height="16" rx="3"/><circle cx="16" cy="16" r="3.5"/><path d="M7 12v.01M25 20v.01"/>',
+    trophy: '<path d="M10 5h12v6a6 6 0 0 1-12 0zM10 8H5a5 5 0 0 0 5 5M22 8h5a5 5 0 0 1-5 5M16 17v5M11 27h10M12 22h8v5h-8z"/>',
+    bell: '<path d="M8 22V14a8 8 0 0 1 16 0v8l2 3H6zM13 28a3 3 0 0 0 6 0"/>',
+    chart: '<path d="M5 27h22M9 23V15M16 23V8M23 23v-5"/>',
+    edit: '<path d="M20 6l6 6-14 14H6v-6z"/><path d="M17 9l6 6"/>',
+    trash: '<path d="M5 9h22M12 9V5h8v4M8 9l1.5 18h13L24 9M13 14v8M19 14v8"/>',
+    pin: '<path d="M16 29s9-8.4 9-15a9 9 0 0 0-18 0c0 6.6 9 15 9 15Z"/><circle cx="16" cy="14" r="3.2"/>',
+    lock: '<rect x="6" y="14" width="20" height="14" rx="3"/><path d="M11 14V10a5 5 0 0 1 10 0v4"/>',
     ig: '<rect x="4" y="4" width="24" height="24" rx="7"/><circle cx="16" cy="16" r="5.5"/><circle cx="23" cy="9" r="1.2" fill="currentColor" stroke="none"/>', star: '<path d="m16 3 3.9 8.4 9.1 1-6.8 6.2 1.9 9-8.1-4.6-8.1 4.6 1.9-9L3 12.4l9.1-1z"/>',
   };
   const icon = (n, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n] || ''}</svg>`;
@@ -308,84 +318,124 @@
   const refHref = r => r.client_id ? `#/clients/${r.client_id}` : r.lead_id ? `#/leads/${r.lead_id}` : '';
 
   // ---------- views ----------
+  const MARK = '<svg class="mark" viewBox="0 0 44 52" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 50V22a18 18 0 0 1 36 0v28"/><path d="M12 50V23a10 10 0 0 1 20 0v27"/><path d="M1 50h42"/></svg>';
+  const avClass = n => 'av-' + ([...String(n || '')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % 6);
+  const avatar = (name, cls = '') => `<span class="avatar ${avClass(name)} ${cls}" aria-hidden="true">${esc(initials(name))}</span>`;
+  const stagePill = s => `<span class="stage-pill"><span class="dot dot-${s}"></span>${esc(stageLabel(s))}</span>`;
+  const empty = (ic, title, text = '', cls = '') => `<div class="empty ${cls}"><span class="empty-ic">${icon(ic)}</span><strong>${esc(title)}</strong>${text ? `<span>${esc(text)}</span>` : ''}</div>`;
+  const cardHead = (ic, title, sub = '', link = '') => `<div class="card-head"><div class="card-title"><span class="chip-ic">${icon(ic)}</span><div><h2>${title}</h2>${sub ? `<p>${sub}</p>` : ''}</div></div>${link}</div>`;
+  function spark(vals) {
+    if (!vals.length) return '';
+    const max = Math.max(...vals, 1), W = 100, H = 30, step = W / Math.max(vals.length - 1, 1);
+    const pts = vals.map((v, i) => [i * step, H - 3 - (v / max) * (H - 6)]);
+    const line = pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ');
+    const last = pts[pts.length - 1];
+    return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polygon class="area" points="0,${H} ${line} ${W},${H}"/><polyline points="${line}"/><circle cx="${last[0]}" cy="${last[1]}" r="3.5"/></svg>`;
+  }
+  function progress(p) {
+    if (p.status === 'completed') return { pct: 100, cls: 'full', label: 'Completed' };
+    if (!p.start_date || !p.target_date) return null;
+    const s = new Date(p.start_date + 'T12:00:00'), t = new Date(p.target_date + 'T12:00:00'), n = new Date(today() + 'T12:00:00');
+    const pct = Math.max(0, Math.min(100, Math.round(((n - s) / Math.max(t - s, 864e5)) * 100)));
+    const late = n > t;
+    const days = Math.round((t - n) / 864e5);
+    return { pct, cls: late ? 'late' : '', label: late ? `${-days} day${days === -1 ? '' : 's'} past target` : days === 0 ? 'Due today' : `${days} day${days === 1 ? '' : 's'} to go` };
+  }
+  const progressBar = pr => pr ? `<div class="progress ${pr.cls}" role="img" aria-label="${esc(pr.label)}, ${pr.pct}% of timeline"><svg viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true"><rect x="0" y="0" height="6" rx="3" width="${pr.pct}"/></svg></div>` : '';
+
   const NAV = [['dashboard', 'Dashboard', 'dash'], ['leads', 'Leads', 'leads'], ['tasks', 'Tasks', 'tasks'], ['clients', 'Clients', 'clients'], ['projects', 'Projects', 'projects']];
   function shell(route, inner) {
     const due = dueCount();
     const link = ([id, label, ic]) => `<a href="#/${id}"${route === id ? ' aria-current="page"' : ''}>${icon(ic)}<span>${label}</span>${id === 'tasks' && due ? `<b class="badge" aria-label="${due} due">${due}</b>` : ''}</a>`;
+    const who = DEMO ? 'Demo mode' : esc(auth.s?.email || '');
     return `<div class="shell">
-      <nav class="sidenav" aria-label="CRM">
-        <div class="side-brand"><span>Interiors by</span><strong>JanLee</strong><em>Studio CRM</em></div>
-        ${NAV.map(link).join('')}
-        <div class="side-foot">
+      <aside class="sidenav" aria-label="CRM">
+        <a class="side-brand" href="#/dashboard">${MARK}<span><span>Interiors by</span><strong>JanLee</strong></span></a>
+        <div class="side-label">Workspace</div>
+        <nav class="side-nav" aria-label="Sections">${NAV.map(link).join('')}</nav>
+        <div class="side-links">
           <a href="#" data-action="export">${icon('dl')} Export leads (CSV)</a>
           <a href="/" target="_blank" rel="noopener">${icon('site')} View website</a>
           <a href="${esc(IG)}" target="_blank" rel="noopener">${icon('ig')} Instagram</a>
-          ${DEMO ? `<a href="#" data-action="reset-demo">${icon('star')} Reset demo data</a>` : `<a href="#" data-action="signout">${icon('out')} Sign out</a>`}
-          <span>${DEMO ? 'Demo mode' : esc(auth.s?.email || '')}</span>
+          ${DEMO ? `<a href="#" data-action="reset-demo">${icon('star')} Reset demo data</a>` : ''}
         </div>
-      </nav>
+        <div class="side-user">${avatar('Jan Lee')}<div><strong>JanLee</strong><small>${who}</small></div>
+          ${DEMO ? '' : `<button class="icon-btn" type="button" data-action="signout" aria-label="Sign out">${icon('out')}</button>`}</div>
+      </aside>
       <div>
-        ${DEMO ? '<div class="demo-banner"><strong>Demo mode</strong> — sample data stored only in this browser. Connect Supabase to use real data.</div>' : ''}
-        <header class="topbar"><a class="mini-brand" href="#/dashboard"><span>Interiors by</span>JanLee</a>
-          <a class="icon-btn" href="${esc(IG)}" target="_blank" rel="noopener" aria-label="Instagram (opens in a new tab)">${icon('ig')}</a>
+        ${DEMO ? `<div class="demo-banner">${icon('star')}<span><strong>Demo mode</strong> — sample data stored only in this browser.</span></div>` : ''}
+        <header class="topbar">
+          <a class="mini-brand" href="#/dashboard">${MARK}<span><small>Interiors by</small>JanLee</span></a>
+          <div class="gsearch" role="search">${icon('search')}<input class="input" type="search" data-gsearch placeholder="Search leads & clients…" aria-label="Search leads and clients" autocomplete="off"><div class="gresults" hidden></div></div>
+          <span class="spacer"></span>
+          <a class="icon-btn m-only" href="${esc(IG)}" target="_blank" rel="noopener" aria-label="Instagram (opens in a new tab)">${icon('ig')}</a>
           <button class="btn btn-primary btn-sm" type="button" data-action="new-lead">${icon('plus')} Lead</button>
-          <button class="icon-btn" type="button" data-action="${DEMO ? 'reset-demo' : 'signout'}" aria-label="${DEMO ? 'Reset demo data' : 'Sign out'}">${icon(DEMO ? 'star' : 'out')}</button>
+          ${DEMO ? `<button class="icon-btn m-only" type="button" data-action="reset-demo" aria-label="Reset demo data">${icon('star')}</button>` : `<button class="icon-btn m-only" type="button" data-action="signout" aria-label="Sign out">${icon('out')}</button>`}
         </header>
-        <main class="main" id="main">${inner}</main>
+        <main class="main${enterAnim ? ' enter' : ''}" id="main">${inner}</main>
       </div>
-      <nav class="tabbar" aria-label="CRM">${NAV.map(link).join('')}</nav>
+      <nav class="tabbar" aria-label="Sections">${NAV.map(link).join('')}</nav>
     </div>`;
   }
 
   function vDashboard() {
     const now = new Date(), mk = monthKey(now), prev = monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-    const thisM = S.leads.filter(l => monthKey(new Date(l.created_at)) === mk).length;
-    const lastM = S.leads.filter(l => monthKey(new Date(l.created_at)) === prev).length;
-    const delta = thisM - lastM;
+    const months = [...Array(6)].map((_, i) => { const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1); return { k: monthKey(d), label: MON[d.getMonth()] }; });
+    const inMonth = (l, k) => monthKey(new Date(l.created_at)) === k;
+    const thisM = S.leads.filter(l => inMonth(l, mk)).length, lastM = S.leads.filter(l => inMonth(l, prev)).length, delta = thisM - lastM;
     const open = S.leads.filter(l => OPEN.includes(l.stage));
     const openVal = open.reduce((s, l) => s + (Number(l.value) || 0), 0);
-    const won = S.leads.filter(l => l.stage === 'won').length, lost = S.leads.filter(l => l.stage === 'lost').length;
+    const wonL = S.leads.filter(l => l.stage === 'won'), won = wonL.length, lost = S.leads.filter(l => l.stage === 'lost').length;
     const rate = won + lost ? Math.round((won / (won + lost)) * 100) : 0;
-    const active = S.projects.filter(p => p.status !== 'completed').length;
+    const active = S.projects.filter(p => p.status !== 'completed');
     const t = today();
     const dueTasks = openTasks().filter(x => x.due_date && x.due_date <= t).sort((a, b) => (a.due_date < b.due_date ? -1 : 1));
     const dueFollow = open.filter(l => l.next_follow_up && l.next_follow_up <= t).sort((a, b) => (a.next_follow_up < b.next_follow_up ? -1 : 1));
-    const months = [...Array(6)].map((_, i) => { const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1); return { k: monthKey(d), label: MON[d.getMonth()] }; });
-    const perMonth = months.map(m => ({ label: m.label, value: S.leads.filter(l => monthKey(new Date(l.created_at)) === m.k).length }));
+    const perMonth = months.map(m => ({ label: m.label, value: S.leads.filter(l => inMonth(l, m.k)).length }));
+    const wonPerMonth = months.map(m => wonL.filter(l => monthKey(new Date(l.updated_at || l.created_at)) === m.k).length);
     const stageRows = STAGES.filter(s => s.id !== 'lost').map(s => {
       const ls = S.leads.filter(l => l.stage === s.id), v = ls.reduce((a, l) => a + (Number(l.value) || 0), 0);
-      return { label: s.label, value: ls.length, display: `${ls.length}`, tip: `${s.label}: ${ls.length} lead${ls.length === 1 ? '' : 's'} · ${money(v)}` };
+      return { label: s.label, value: ls.length, tip: `${s.label}: ${ls.length} lead${ls.length === 1 ? '' : 's'} · ${money(v)}` };
     });
     const typeRows = PTYPES.map(p => ({ label: p, value: S.leads.filter(l => l.project_type === p).length })).filter(r => r.value).sort((a, b) => b.value - a.value).slice(0, 6);
     const hello = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
-    return `<div class="page-head"><div><h1>${hello}, JanLee</h1><p>${now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p></div>
-      <div class="head-actions"><button class="btn btn-ghost" type="button" data-action="new-task">${icon('plus')} Task</button><button class="btn btn-primary" type="button" data-action="new-lead">${icon('plus')} New lead</button></div></div>
+    const n = dueFollow.length + dueTasks.length, newNow = S.leads.filter(l => l.stage === 'new').length;
+    const summary = n || newNow
+      ? `You have ${n ? `<strong>${n} item${n === 1 ? '' : 's'}</strong> needing attention today` : 'nothing overdue'}${newNow ? ` and <strong>${newNow} new lead${newNow === 1 ? '' : 's'}</strong> waiting for a reply` : ''}.`
+      : 'You’re all caught up — a perfect day to dream up something beautiful.';
+    const tile = (label, ic, value, deltaHtml, sp = '') => `<div class="stat-tile"><div class="stat-top"><span class="stat-label">${label}</span><span class="stat-ic">${icon(ic)}</span></div><div class="stat-value">${value}</div>${deltaHtml}${sp}</div>`;
+    return `<section class="welcome" aria-label="Welcome">
+        <img src="/assets/img/projects/calming-earthy-sage-green-kitchen/cover-lg.webp" alt="" width="1600" height="1066">
+        <p class="eyebrow">${now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+        <h1>${hello}, JanLee</h1>
+        <p>${summary}</p>
+        <div class="head-actions"><button class="btn btn-gold" type="button" data-action="new-lead">${icon('plus')} New lead</button><button class="btn btn-glass" type="button" data-action="new-task">${icon('tasks')} Add task</button><a class="btn btn-glass hide-sm" href="#/leads">${icon('leads')} Pipeline</a></div>
+      </section>
     <section class="stats" aria-label="Key numbers">
-      <div class="stat-tile hero-tile"><div class="stat-label">New leads this month</div><div class="stat-value">${thisM}</div>
-        <div class="stat-delta">${delta === 0 ? 'Same as last month' : `${delta > 0 ? '+' : '−'}${Math.abs(delta)} vs last month (${lastM})`}</div></div>
-      <div class="stat-tile"><div class="stat-label">Open pipeline</div><div class="stat-value">${compact(openVal)}</div><div class="stat-delta">${open.length} open lead${open.length === 1 ? '' : 's'}</div></div>
-      <div class="stat-tile"><div class="stat-label">Win rate</div><div class="stat-value">${rate}%</div><div class="stat-delta">${won} won · ${lost} lost</div></div>
-      <div class="stat-tile"><div class="stat-label">Active projects</div><div class="stat-value">${active}</div><div class="stat-delta">${S.clients.length} client${S.clients.length === 1 ? '' : 's'}</div></div>
+      ${tile('New leads this month', 'leads', thisM, `<div class="stat-delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : ''}">${delta === 0 ? 'Same as last month' : `${delta > 0 ? '▲' : '▼'} ${Math.abs(delta)} vs last month`}</div>`, spark(perMonth.map(r => r.value)))}
+      ${tile('Open pipeline', 'money', compact(openVal), `<div class="stat-delta">${open.length} open lead${open.length === 1 ? '' : 's'}</div>`)}
+      ${tile('Win rate', 'trophy', `${rate}%`, `<div class="stat-delta">${won} won · ${lost} lost</div>`, spark(wonPerMonth))}
+      ${tile('Active projects', 'projects', active.length, `<div class="stat-delta">${money(active.reduce((s, p) => s + (Number(p.budget) || 0), 0))} in budgets</div>`)}
     </section>
     <div class="dash-grid">
       <section class="card" aria-labelledby="h-today">
-        <div class="card-head"><div><h2 id="h-today">Needs attention</h2><p>Overdue and due today</p></div><a class="linklike" href="#/tasks">All tasks</a></div>
+        ${cardHead('bell', '<span id="h-today">Needs attention</span>', 'Overdue and due today', '<a class="linklike" href="#/tasks">All tasks</a>')}
         <div class="today-list">
-          ${dueFollow.map(l => `<a class="today-item row" href="#/leads/${l.id}"><span class="avatar">${esc(initials(l.name))}</span><span class="grow"><span class="t">Follow up: ${esc(l.name)}</span><span class="s">${esc(stageLabel(l.stage))} · ${esc(l.project_type || '')}</span></span>${dueBadge(l.next_follow_up)}</a>`).join('')}
-          ${dueTasks.map(x => `<label class="today-item"><input type="checkbox" data-task-done="${x.id}" aria-label="Mark done: ${esc(x.title)}"><span class="grow"><span class="t">${esc(x.title)}</span><span class="s">${esc(refName(x))}</span></span>${dueBadge(x.due_date)}</label>`).join('')}
-          ${dueFollow.length + dueTasks.length ? '' : `<p class="empty">${icon('check')} You're all caught up.</p>`}
+          ${dueFollow.map(l => `<a class="today-item" href="#/leads/${l.id}">${avatar(l.name)}<span class="grow"><span class="t">Follow up with ${esc(l.name)}</span><span class="s">${esc(stageLabel(l.stage))} · ${esc(l.project_type || '')}</span></span>${dueBadge(l.next_follow_up)}</a>`).join('')}
+          ${dueTasks.map(x => `<label class="today-item"><input type="checkbox" data-task-done="${x.id}" aria-label="Mark done: ${esc(x.title)}"><span class="grow"><span class="t">${esc(x.title)}</span><span class="s">${esc(refName(x) || 'Task')}</span></span>${dueBadge(x.due_date)}</label>`).join('')}
+          ${n ? '' : empty('check', 'All caught up', 'Nothing is overdue or due today.', 'good')}
         </div>
       </section>
-      <section class="card" aria-labelledby="h-month"><div class="card-head"><div><h2 id="h-month">New leads per month</h2><p>Last 6 months</p></div></div>${columnChart(perMonth, { unit: 'Leads', label: 'New leads per month, last 6 months' })}</section>
-      <section class="card" aria-labelledby="h-stage"><div class="card-head"><div><h2 id="h-stage">Leads by stage</h2><p>Hover a bar for pipeline value</p></div><a class="linklike" href="#/leads">Open pipeline</a></div>${barChart(stageRows, { unit: 'Leads', label: 'Number of leads in each stage' })}</section>
-      <section class="card" aria-labelledby="h-type"><div class="card-head"><div><h2 id="h-type">What clients ask for</h2><p>Leads by project type</p></div></div>${typeRows.length ? barChart(typeRows, { unit: 'Leads', label: 'Leads by project type' }) : '<p class="empty">No leads yet.</p>'}</section>
-      <section class="card span-2" aria-labelledby="h-recent"><div class="card-head"><div><h2 id="h-recent">Latest leads</h2></div><a class="linklike" href="#/leads?view=list">See all</a></div>
-        <div>${S.leads.slice(0, 5).map(leadRow).join('') || '<p class="empty">No leads yet. Website enquiries will appear here automatically.</p>'}</div></section>
+      <section class="card" aria-labelledby="h-month">${cardHead('chart', '<span id="h-month">New leads per month</span>', 'Last 6 months')}${columnChart(perMonth, { unit: 'Leads', label: 'New leads per month, last 6 months' })}</section>
+      <section class="card" aria-labelledby="h-stage">${cardHead('leads', '<span id="h-stage">Leads by stage</span>', 'Hover a bar for pipeline value', '<a class="linklike" href="#/leads">Open pipeline</a>')}${barChart(stageRows, { unit: 'Leads', label: 'Number of leads in each stage' })}</section>
+      <section class="card" aria-labelledby="h-type">${cardHead('star', '<span id="h-type">What clients ask for</span>', 'Leads by project type')}${typeRows.length ? barChart(typeRows, { unit: 'Leads', label: 'Leads by project type' }) : empty('star', 'No leads yet')}</section>
+      <section class="card span-2" aria-labelledby="h-recent">${cardHead('clients', '<span id="h-recent">Latest leads</span>', 'Newest enquiries first', '<a class="linklike" href="#/leads?view=list">See all</a>')}
+        <div class="list">${S.leads.slice(0, 5).map(leadRow).join('') || empty('leads', 'No leads yet', 'Website enquiries will appear here automatically.')}</div></section>
     </div>`;
   }
-  const leadRow = l => `<a class="row" href="#/leads/${l.id}"><span class="avatar">${esc(initials(l.name))}</span>
+  const leadRow = l => `<a class="row" href="#/leads/${l.id}">${avatar(l.name)}
     <span class="grow"><span class="t">${esc(l.name)}</span><span class="s">${esc(l.project_type || '—')} · ${esc(srcLabel(l.source))} · ${rel(l.created_at)}</span></span>
-    <span class="r"><span class="stage-pill stage-${l.stage}">${esc(stageLabel(l.stage))}</span><br><small>${l.value ? money(l.value) : ''}</small></span></a>`;
+    <span class="r">${stagePill(l.stage)}<small>${l.value ? money(l.value) : ''}</small></span></a>`;
 
   let leadView = 'board', leadQuery = '', leadStage = 'all';
   function vLeads(params) {
@@ -393,72 +443,83 @@
     const q = leadQuery.toLowerCase();
     const match = l => !q || [l.name, l.email, l.phone, l.project_type, l.message].some(v => String(v || '').toLowerCase().includes(q));
     const list = S.leads.filter(match);
-    const head = `<div class="page-head"><div><h1>Leads</h1><p>${S.leads.filter(l => OPEN.includes(l.stage)).length} open · ${money(S.leads.filter(l => OPEN.includes(l.stage)).reduce((s, l) => s + (Number(l.value) || 0), 0))} in pipeline</p></div>
+    const open = S.leads.filter(l => OPEN.includes(l.stage));
+    const head = `<div class="page-head"><div><p class="eyebrow">Pipeline</p><h1>Leads</h1><p>${open.length} open · ${money(open.reduce((s, l) => s + (Number(l.value) || 0), 0))} potential value</p></div>
       <div class="head-actions"><button class="btn btn-primary" type="button" data-action="new-lead">${icon('plus')} New lead</button></div></div>
-      <div class="toolbar"><input class="input" type="search" placeholder="Search name, email, phone, project…" value="${esc(leadQuery)}" data-search="leads" aria-label="Search leads">
-        <div class="seg" role="group" aria-label="View"><button type="button" data-leadview="board" aria-pressed="${leadView === 'board'}">Pipeline</button><button type="button" data-leadview="list" aria-pressed="${leadView === 'list'}">List</button></div></div>`;
+      <div class="toolbar"><label class="searchbox">${icon('search')}<span class="sr">Search leads</span><input class="input" type="search" placeholder="Search name, email, phone, project…" value="${esc(leadQuery)}" data-search="leads"></label>
+        <div class="seg" role="group" aria-label="View"><button type="button" data-leadview="board" aria-pressed="${leadView === 'board'}">${icon('dash')} Board</button><button type="button" data-leadview="list" aria-pressed="${leadView === 'list'}">${icon('list')} List</button></div></div>`;
     if (leadView === 'board') {
       const fine = matchMedia('(pointer: fine)').matches;
       return head + `<div class="board">${STAGES.map(s => {
         const ls = list.filter(l => l.stage === s.id), v = ls.reduce((a, l) => a + (Number(l.value) || 0), 0);
-        return `<section class="col" data-drop="${s.id}" aria-label="${s.label}"><div class="col-head"><h2>${s.label}</h2><span>${ls.length}${v ? ' · ' + compact(v) : ''}</span></div>
+        return `<section class="col col-${s.id}" data-drop="${s.id}" aria-label="${s.label}"><div class="col-head"><h2><span class="dot dot-${s.id}"></span>${s.label}</h2><span class="count">${ls.length}</span></div>
+          <div class="col-sum">${v ? compact(v) + ' value' : ''}</div>
           ${ls.map(l => `<a class="lead-card" href="#/leads/${l.id}" data-lead="${l.id}"${fine ? ' draggable="true"' : ''}>
-            <span class="n">${esc(l.name)}</span><span class="m">${esc(l.project_type || '—')}</span>
-            <span class="m">${l.value ? `<span class="v">${money(l.value)}</span>` : ''}${OPEN.includes(l.stage) ? dueBadge(l.next_follow_up) : ''}<span>${rel(l.created_at)}</span></span></a>`).join('') || '<p class="empty">—</p>'}
+            <span class="lc-top">${avatar(l.name)}<span><span class="n">${esc(l.name)}</span><span class="p">${esc(l.project_type || '—')}</span></span></span>
+            <span class="lc-foot">${l.value ? `<span class="v">${money(l.value)}</span>` : '<span class="v"></span>'}${OPEN.includes(l.stage) && l.next_follow_up ? dueBadge(l.next_follow_up) : `<span>${rel(l.created_at)}</span>`}</span></a>`).join('') || `<div class="empty">${fine ? 'Drag a lead here' : 'No leads'}</div>`}
         </section>`;
       }).join('')}</div>`;
     }
     const counts = Object.fromEntries(STAGES.map(s => [s.id, list.filter(l => l.stage === s.id).length]));
     const shown = list.filter(l => leadStage === 'all' || l.stage === leadStage);
     return head + `<div class="chips" role="group" aria-label="Filter by stage"><button class="chip" type="button" data-stagefilter="all" aria-pressed="${leadStage === 'all'}">All<span>${list.length}</span></button>
-      ${STAGES.map(s => `<button class="chip" type="button" data-stagefilter="${s.id}" aria-pressed="${leadStage === s.id}">${s.label}<span>${counts[s.id]}</span></button>`).join('')}</div>
-      <div class="list">${shown.map(leadRow).join('') || '<p class="empty">No leads match.</p>'}</div>`;
+      ${STAGES.map(s => `<button class="chip" type="button" data-stagefilter="${s.id}" aria-pressed="${leadStage === s.id}"><span class="dot dot-${s.id}"></span>${s.label}<span>${counts[s.id]}</span></button>`).join('')}</div>
+      <div class="list">${shown.map(leadRow).join('') || empty('search', 'No leads match', 'Try a different search or filter.')}</div>`;
   }
 
+  const KIND_IC = { note: 'note', call: 'phone', email: 'mail', meeting: 'meet', stage: 'stage' };
   function timeline(ref) {
     const key = Object.keys(ref)[0], items = S.activities.filter(a => a[key] === ref[key]);
-    const ic = { note: 'note', call: 'phone', email: 'mail', meeting: 'meet', stage: 'stage' };
     return `<form class="note-form" data-note='${esc(JSON.stringify(ref))}'>
         <label class="sr" for="note-body">Add a note</label><textarea class="input" id="note-body" name="body" rows="3" maxlength="5000" placeholder="Add a note, call summary or next step…" required></textarea>
-        <div class="row-btns"><select class="input" name="kind" aria-label="Type">${opts(KINDS, 'note')}</select><button class="btn btn-primary btn-sm" type="submit">Add to history</button></div></form>
-      <div class="timeline">${items.map(a => `<div class="tl"><span class="dot">${icon(ic[a.kind] || 'note')}</span><div><div class="body">${esc(a.body)}</div><div class="when">${esc((KINDS.find(k => k[0] === a.kind) || ['', a.kind === 'stage' ? 'Update' : 'Note'])[1])} · ${rel(a.created_at)}</div></div></div>`).join('') || '<p class="empty">No history yet.</p>'}</div>`;
+        <div class="row-btns"><select class="input" name="kind" aria-label="Type">${opts(KINDS, 'note')}</select><button class="btn btn-primary btn-sm" type="submit">${icon('plus')} Add to history</button></div></form>
+      <div class="timeline">${items.map(a => `<div class="tl${a.kind === 'stage' ? ' is-stage' : ''}"><span class="tdot k-${esc(a.kind)}">${icon(KIND_IC[a.kind] || 'note')}</span><div><div class="body">${esc(a.body)}</div><div class="when">${esc((KINDS.find(k => k[0] === a.kind) || ['', a.kind === 'stage' ? 'Update' : 'Note'])[1])} · ${rel(a.created_at)}</div></div></div>`).join('') || empty('note', 'No history yet', 'Notes, calls and stage changes will appear here.')}</div>`;
   }
   function taskList(ref) {
     const key = Object.keys(ref)[0], items = S.tasks.filter(t => t[key] === ref[key]).sort((a, b) => (a.done - b.done) || String(a.due_date || '9').localeCompare(String(b.due_date || '9')));
-    return `<form class="add-inline" data-addtask='${esc(JSON.stringify(ref))}'><input class="input" name="title" maxlength="200" placeholder="New task…" required aria-label="Task"><input class="input" type="date" name="due_date" aria-label="Due date"><button class="btn btn-ghost btn-sm" type="submit">${icon('plus')} Add</button></form>
-      ${items.map(taskItem).join('') || '<p class="empty">No tasks.</p>'}`;
+    return `<div class="list"><form class="add-inline" data-addtask='${esc(JSON.stringify(ref))}'><input class="input" name="title" maxlength="200" placeholder="New task…" required aria-label="Task"><input class="input" type="date" name="due_date" aria-label="Due date"><button class="btn btn-ghost btn-sm" type="submit">${icon('plus')} Add</button></form>
+      ${items.map(taskItem).join('') || empty('tasks', 'No tasks yet')}</div>`;
   }
   const taskItem = x => `<div class="task${x.done ? ' is-done' : ''}"><input type="checkbox" data-task-done="${x.id}" ${x.done ? 'checked' : ''} aria-label="${x.done ? 'Mark not done' : 'Mark done'}: ${esc(x.title)}">
-    <div class="grow"><div class="t">${esc(x.title)}</div><div class="s">${x.done ? `<span>Done ${x.completed_at ? rel(x.completed_at) : ''}</span>` : dueBadge(x.due_date)}${refName(x) ? (refHref(x) ? `<a href="${refHref(x)}">${esc(refName(x))}</a>` : `<span>${esc(refName(x))}</span>`) : ''}</div></div>
-    <button class="icon-btn" type="button" data-task-del="${x.id}" aria-label="Delete task">${icon('close')}</button></div>`;
+    <div class="grow"><div class="t">${esc(x.title)}</div><div class="s">${x.done ? `<span class="status status-good">${icon('check')} Done ${x.completed_at ? rel(x.completed_at) : ''}</span>` : dueBadge(x.due_date)}${refName(x) ? (refHref(x) ? `<a href="${refHref(x)}">${esc(refName(x))}</a>` : `<span>${esc(refName(x))}</span>`) : ''}</div></div>
+    <button class="icon-btn" type="button" data-task-del="${x.id}" aria-label="Delete task">${icon('trash')}</button></div>`;
 
+  function stepper(l) {
+    const order = ['new', 'contacted', 'consultation', 'proposal', 'won'];
+    const lostAt = l.stage === 'lost';
+    const idx = lostAt ? -1 : order.indexOf(l.stage);
+    return `<div class="stepper${lostAt ? ' is-lost' : ''}" role="group" aria-label="Stage">${order.map((s, i) => `<button type="button" class="step${i < idx ? ' done' : ''}${i === idx ? ' current' : ''}${s === 'won' ? ' won-step' : ''}" data-step="${s}" data-id="${l.id}" aria-pressed="${i === idx}" aria-label="Set stage to ${stageLabel(s)}"><span class="bub">${icon('check')}</span>${stageLabel(s)}</button>`).join('')}</div>
+      ${lostAt ? `<p class="lost-note"><span class="status status-muted">${icon('close')} Marked as lost</span>${l.lost_reason ? esc(l.lost_reason) : ''}<button class="linklike" type="button" data-step="new" data-id="${l.id}">Reopen lead</button></p>`
+        : l.stage !== 'won' ? `<p class="lost-note"><button class="linklike" type="button" data-action="mark-lost" data-id="${l.id}">Mark as lost</button></p>` : ''}`;
+  }
+  const telHref = p => `tel:${esc(String(p).replace(/[^\d+]/g, ''))}`;
   function vLead(id) {
     const l = byId('leads', id);
-    if (!l) return `<a class="back" href="#/leads">${icon('back')} Leads</a><p class="empty">This lead no longer exists.</p>`;
+    if (!l) return `<a class="back" href="#/leads">${icon('back')} Leads</a>${empty('search', 'This lead no longer exists')}`;
     const client = l.client_id && byId('clients', l.client_id);
     return `<a class="back" href="#/leads">${icon('back')} Leads</a>
-    <div class="page-head"><div><h1>${esc(l.name)}</h1><p>${esc(l.project_type || 'Lead')} · added ${rel(l.created_at)} · ${esc(srcLabel(l.source))}</p></div>
-      <div class="head-actions">${l.phone ? `<a class="btn btn-ghost" href="tel:${esc(l.phone.replace(/[^\d+]/g, ''))}">${icon('phone')} Call</a>` : ''}${l.email ? `<a class="btn btn-ghost" href="mailto:${esc(l.email)}">${icon('mail')} Email</a>` : ''}</div></div>
+    <section class="profile"><div class="profile-in">${avatar(l.name)}
+      <div class="profile-txt"><h1>${esc(l.name)}</h1><div class="meta"><span>${icon('star')} ${esc(l.project_type || 'Lead')}</span><span>${icon('money')} ${money(l.value)}</span><span>${icon('clock')} Added ${rel(l.created_at)}</span><span>${icon('site')} ${esc(srcLabel(l.source))}</span></div></div>
+      <div class="head-actions">${l.phone ? `<a class="btn btn-ghost btn-sm" href="${telHref(l.phone)}">${icon('phone')} Call</a>` : ''}${l.email ? `<a class="btn btn-ghost btn-sm" href="mailto:${esc(l.email)}">${icon('mail')} Email</a>` : ''}<button class="btn btn-ghost btn-sm" type="button" data-action="edit-lead" data-id="${l.id}">${icon('edit')} Edit</button></div>
+    </div>${stepper(l)}</section>
     <div class="detail">
       <section class="card">
-        <div class="card-head"><h2>Details</h2><button class="linklike" type="button" data-action="edit-lead" data-id="${l.id}">Edit</button></div>
-        <div class="field"><label for="stage-sel">Stage</label><select id="stage-sel" data-stage-of="${l.id}">${opts(STAGES.map(s => [s.id, s.label]), l.stage)}</select></div>
+        ${cardHead('clients', 'Details', l.next_follow_up && OPEN.includes(l.stage) ? 'Next follow-up ' + fmtDate(l.next_follow_up) : '')}
         <dl class="kv">
-          <dt>Value</dt><dd>${money(l.value)}</dd>
+          <dt>Stage</dt><dd>${stagePill(l.stage)}</dd>
           <dt>Follow up</dt><dd>${l.next_follow_up ? dueBadge(l.next_follow_up) : '<span class="status status-muted">Not set</span>'}</dd>
           <dt>Email</dt><dd>${l.email ? `<a href="mailto:${esc(l.email)}">${esc(l.email)}</a>` : '—'}</dd>
-          <dt>Phone</dt><dd>${l.phone ? `<a href="tel:${esc(l.phone.replace(/[^\d+]/g, ''))}">${esc(l.phone)}</a>` : '—'}</dd>
+          <dt>Phone</dt><dd>${l.phone ? `<a href="${telHref(l.phone)}">${esc(l.phone)}</a>` : '—'}</dd>
           <dt>Zip</dt><dd>${esc(l.zip || '—')}</dd>
-          ${l.stage === 'lost' && l.lost_reason ? `<dt>Lost reason</dt><dd>${esc(l.lost_reason)}</dd>` : ''}
           ${client ? `<dt>Client</dt><dd><a href="#/clients/${client.id}">${esc(client.name)}</a></dd>` : ''}
         </dl>
         ${l.message ? `<div class="message-box">${esc(l.message)}</div>` : ''}
-        <div class="actions-row">${client ? '' : `<button class="btn btn-primary" type="button" data-action="convert" data-id="${l.id}">${icon('check')} Convert to client</button>`}
-          <button class="btn btn-danger" type="button" data-action="del-lead" data-id="${l.id}">Delete lead</button></div>
+        <div class="actions-row">${client ? `<a class="btn btn-ghost" href="#/clients/${client.id}">${icon('clients')} View client</a>` : `<button class="btn btn-gold" type="button" data-action="convert" data-id="${l.id}">${icon('check')} Convert to client</button>`}
+          <button class="btn btn-danger" type="button" data-action="del-lead" data-id="${l.id}">${icon('trash')} Delete</button></div>
       </section>
       <div class="detail-side">
-        <section class="card"><div class="card-head"><h2>Tasks</h2></div>${taskList({ lead_id: l.id })}</section>
-        <section class="card"><div class="card-head"><h2>History</h2></div>${timeline({ lead_id: l.id })}</section>
+        <section class="card">${cardHead('tasks', 'Tasks')}${taskList({ lead_id: l.id })}</section>
+        <section class="card">${cardHead('note', 'History', 'Notes, calls & updates')}${timeline({ lead_id: l.id })}</section>
       </div>
     </div>`;
   }
@@ -466,75 +527,95 @@
   function vTasks() {
     const t = today(), open = openTasks();
     const groups = [
-      ['Overdue', open.filter(x => x.due_date && x.due_date < t)],
-      ['Today', open.filter(x => x.due_date === t)],
-      ['Upcoming', open.filter(x => x.due_date && x.due_date > t)],
-      ['No date', open.filter(x => !x.due_date)],
-      ['Completed', S.tasks.filter(x => x.done).slice(0, 15)],
-    ].map(([n, items]) => [n, items.sort((a, b) => String(a.due_date || '').localeCompare(String(b.due_date || '')))]);
+      ['Overdue', 'alert', open.filter(x => x.due_date && x.due_date < t), 'crit'],
+      ['Today', 'clock', open.filter(x => x.due_date === t), ''],
+      ['Upcoming', 'meet', open.filter(x => x.due_date && x.due_date > t), ''],
+      ['No date', 'note', open.filter(x => !x.due_date), ''],
+      ['Completed', 'check', S.tasks.filter(x => x.done).slice(0, 15), ''],
+    ].map(([n, ic, items, c]) => [n, ic, items.sort((a, b) => String(a.due_date || '').localeCompare(String(b.due_date || ''))), c]);
     const follow = S.leads.filter(l => OPEN.includes(l.stage) && l.next_follow_up && l.next_follow_up <= addDays(t, 7)).sort((a, b) => (a.next_follow_up < b.next_follow_up ? -1 : 1));
-    return `<div class="page-head"><div><h1>Tasks</h1><p>${open.length} open · ${open.filter(x => x.due_date && x.due_date < t).length} overdue</p></div></div>
-      <div class="list"><form class="add-inline" data-addtask="{}"><input class="input" name="title" maxlength="200" placeholder="Add a task…" required aria-label="Task"><input class="input" type="date" name="due_date" value="${t}" aria-label="Due date"><button class="btn btn-primary btn-sm" type="submit">${icon('plus')} Add</button></form></div>
-      ${follow.length ? `<h2 class="section-label">Lead follow-ups (next 7 days)</h2><div class="list">${follow.map(l => `<a class="row" href="#/leads/${l.id}"><span class="avatar">${esc(initials(l.name))}</span><span class="grow"><span class="t">${esc(l.name)}</span><span class="s">${esc(stageLabel(l.stage))} · ${esc(l.project_type || '')}</span></span>${dueBadge(l.next_follow_up)}</a>`).join('')}</div>` : ''}
-      ${groups.filter(([, items]) => items.length).map(([n, items]) => `<h2 class="section-label">${n} · ${items.length}</h2><div class="list">${items.map(taskItem).join('')}</div>`).join('')}
-      ${open.length || S.tasks.length ? '' : '<p class="empty">No tasks yet.</p>'}`;
+    const overdue = open.filter(x => x.due_date && x.due_date < t).length;
+    return `<div class="page-head"><div><p class="eyebrow">Stay on track</p><h1>Tasks</h1><p>${open.length} open${overdue ? ` · <span class="status status-crit">${icon('alert')} ${overdue} overdue</span>` : ''}</p></div></div>
+      <div class="list"><form class="add-inline" data-addtask="{}"><input class="input" name="title" maxlength="200" placeholder="What needs doing?" required aria-label="Task"><input class="input" type="date" name="due_date" value="${t}" aria-label="Due date"><button class="btn btn-primary btn-sm" type="submit">${icon('plus')} Add task</button></form></div>
+      ${follow.length ? `<h2 class="section-label">${icon('phone')} Lead follow-ups · next 7 days <span class="n">${follow.length}</span></h2><div class="list">${follow.map(l => `<a class="row" href="#/leads/${l.id}">${avatar(l.name)}<span class="grow"><span class="t">${esc(l.name)}</span><span class="s">${esc(stageLabel(l.stage))} · ${esc(l.project_type || '')}</span></span>${dueBadge(l.next_follow_up)}</a>`).join('')}</div>` : ''}
+      ${groups.filter(([, , items]) => items.length).map(([n, ic, items, c]) => `<h2 class="section-label ${c}">${icon(ic)} ${n} <span class="n">${items.length}</span></h2><div class="list">${items.map(taskItem).join('')}</div>`).join('')}
+      ${open.length || S.tasks.length ? '' : empty('tasks', 'No tasks yet', 'Add your first task above.')}`;
   }
 
   let clientQuery = '';
   function vClients() {
     const q = clientQuery.toLowerCase();
     const list = S.clients.filter(c => !q || [c.name, c.email, c.phone, c.address].some(v => String(v || '').toLowerCase().includes(q))).sort((a, b) => a.name.localeCompare(b.name));
-    return `<div class="page-head"><div><h1>Clients</h1><p>${S.clients.length} client${S.clients.length === 1 ? '' : 's'}</p></div><div class="head-actions"><button class="btn btn-primary" type="button" data-action="new-client">${icon('plus')} New client</button></div></div>
-      <div class="toolbar"><input class="input" type="search" placeholder="Search clients…" value="${esc(clientQuery)}" data-search="clients" aria-label="Search clients"></div>
-      <div class="list">${list.map(c => {
-        const ps = S.projects.filter(p => p.client_id === c.id), act = ps.filter(p => p.status !== 'completed').length;
-        return `<a class="row" href="#/clients/${c.id}"><span class="avatar">${esc(initials(c.name))}</span><span class="grow"><span class="t">${esc(c.name)}</span><span class="s">${esc(c.address || c.email || c.phone || '')}</span></span>
-          <span class="r">${ps.length} project${ps.length === 1 ? '' : 's'}<br><small>${act ? `${act} active` : 'none active'}</small></span></a>`;
-      }).join('') || '<p class="empty">No clients yet. Convert a won lead, or add one.</p>'}</div>`;
+    return `<div class="page-head"><div><p class="eyebrow">Relationships</p><h1>Clients</h1><p>${S.clients.length} client${S.clients.length === 1 ? '' : 's'}</p></div><div class="head-actions"><button class="btn btn-primary" type="button" data-action="new-client">${icon('plus')} New client</button></div></div>
+      <div class="toolbar"><label class="searchbox">${icon('search')}<span class="sr">Search clients</span><input class="input" type="search" placeholder="Search clients…" value="${esc(clientQuery)}" data-search="clients"></label></div>
+      ${list.length ? `<div class="client-grid">${list.map(c => {
+        const ps = S.projects.filter(p => p.client_id === c.id), act = ps.filter(p => p.status !== 'completed').length, total = ps.reduce((s, p) => s + (Number(p.budget) || 0), 0);
+        return `<a class="client-card" href="#/clients/${c.id}"><div class="cc-top">${avatar(c.name)}<div><span class="t">${esc(c.name)}</span><span class="s">${esc(c.address || c.email || c.phone || 'No contact details')}</span></div></div>
+          <div class="cc-foot"><span class="status ${act ? 'status-good' : 'status-muted'}">${icon('projects')} ${act ? `${act} active` : 'No active projects'}</span><span class="status status-muted">${ps.length} project${ps.length === 1 ? '' : 's'}</span>${total ? `<span class="status status-muted">${compact(total)}</span>` : ''}</div></a>`;
+      }).join('')}</div>` : `<div class="card">${empty('clients', q ? 'No clients match' : 'No clients yet', q ? 'Try a different search.' : 'Convert a won lead, or add one.')}</div>`}`;
   }
 
   function vClient(id) {
     const c = byId('clients', id);
-    if (!c) return `<a class="back" href="#/clients">${icon('back')} Clients</a><p class="empty">This client no longer exists.</p>`;
+    if (!c) return `<a class="back" href="#/clients">${icon('back')} Clients</a>${empty('search', 'This client no longer exists')}`;
     const ps = S.projects.filter(p => p.client_id === c.id), lead = c.lead_id && byId('leads', c.lead_id);
-    const spent = ps.reduce((s, p) => s + (Number(p.budget) || 0), 0);
+    const total = ps.reduce((s, p) => s + (Number(p.budget) || 0), 0), act = ps.filter(p => p.status !== 'completed').length;
     return `<a class="back" href="#/clients">${icon('back')} Clients</a>
-    <div class="page-head"><div><h1>${esc(c.name)}</h1><p>Client since ${fmtDate(c.created_at)} · ${ps.length} project${ps.length === 1 ? '' : 's'} · ${money(spent)} total</p></div>
-      <div class="head-actions">${c.phone ? `<a class="btn btn-ghost" href="tel:${esc(c.phone.replace(/[^\d+]/g, ''))}">${icon('phone')} Call</a>` : ''}${c.email ? `<a class="btn btn-ghost" href="mailto:${esc(c.email)}">${icon('mail')} Email</a>` : ''}</div></div>
+    <section class="profile"><div class="profile-in">${avatar(c.name)}
+      <div class="profile-txt"><h1>${esc(c.name)}</h1><div class="meta"><span>${icon('clock')} Client since ${fmtDate(c.created_at)}</span>${c.address ? `<span>${icon('pin')} ${esc(c.address)}</span>` : ''}</div></div>
+      <div class="head-actions">${c.phone ? `<a class="btn btn-ghost btn-sm" href="${telHref(c.phone)}">${icon('phone')} Call</a>` : ''}${c.email ? `<a class="btn btn-ghost btn-sm" href="mailto:${esc(c.email)}">${icon('mail')} Email</a>` : ''}<button class="btn btn-ghost btn-sm" type="button" data-action="edit-client" data-id="${c.id}">${icon('edit')} Edit</button></div>
+    </div></section>
     <div class="detail">
       <div class="detail-side">
-        <section class="card"><div class="card-head"><h2>Contact</h2><button class="linklike" type="button" data-action="edit-client" data-id="${c.id}">Edit</button></div>
-          <dl class="kv"><dt>Email</dt><dd>${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '—'}</dd><dt>Phone</dt><dd>${esc(c.phone || '—')}</dd><dt>Address</dt><dd>${esc(c.address || '—')}</dd>
+        <section class="card">${cardHead('projects', 'Projects', '', `<button class="btn btn-ghost btn-sm" type="button" data-action="new-project" data-client="${c.id}">${icon('plus')} Project</button>`)}
+          <div class="mini-stats"><div><small>Projects</small><strong>${ps.length}</strong></div><div><small>Active</small><strong>${act}</strong></div><div><small>Total budget</small><strong>${compact(total)}</strong></div></div>
+          <div class="projects-stack">${ps.map(p => projectCard(p)).join('') || empty('projects', 'No projects yet')}</div></section>
+        <section class="card">${cardHead('clients', 'Contact')}
+          <dl class="kv"><dt>Email</dt><dd>${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '—'}</dd><dt>Phone</dt><dd>${c.phone ? `<a href="${telHref(c.phone)}">${esc(c.phone)}</a>` : '—'}</dd><dt>Address</dt><dd>${esc(c.address || '—')}</dd>
           ${lead ? `<dt>Original lead</dt><dd><a href="#/leads/${lead.id}">${esc(lead.project_type || 'View lead')}</a></dd>` : ''}</dl>
           ${c.notes ? `<div class="message-box">${esc(c.notes)}</div>` : ''}
-          <div class="actions-row"><button class="btn btn-danger btn-sm" type="button" data-action="del-client" data-id="${c.id}">Delete client</button></div></section>
-        <section class="card"><div class="card-head"><h2>Projects</h2><button class="btn btn-ghost btn-sm" type="button" data-action="new-project" data-client="${c.id}">${icon('plus')} Project</button></div>
-          <div class="projects-stack">${ps.map(projectCard).join('') || '<p class="empty">No projects yet.</p>'}</div></section>
+          <div class="actions-row"><button class="btn btn-danger btn-sm" type="button" data-action="del-client" data-id="${c.id}">${icon('trash')} Delete client</button></div></section>
       </div>
       <div class="detail-side">
-        <section class="card"><div class="card-head"><h2>Tasks</h2></div>${taskList({ client_id: c.id })}</section>
-        <section class="card"><div class="card-head"><h2>History</h2></div>${timeline({ client_id: c.id })}</section>
+        <section class="card">${cardHead('tasks', 'Tasks')}${taskList({ client_id: c.id })}</section>
+        <section class="card">${cardHead('note', 'History', 'Notes, calls & updates')}${timeline({ client_id: c.id })}</section>
       </div>
     </div>`;
   }
   const pClass = s => ({ planning: 'status-muted', design: 'status-warn', in_progress: 'status-good', on_hold: 'status-crit', completed: 'status-muted' }[s]);
-  const pIcon = s => ({ on_hold: 'alert', completed: 'check', in_progress: 'clock' }[s] || 'clock');
-  const projectCard = p => `<button class="project-card" type="button" data-action="edit-project" data-id="${p.id}"><span class="t">${esc(p.name)}</span>
-    <span class="s"><span class="status ${pClass(p.status)}">${icon(pIcon(p.status))} ${esc(pLabel(p.status))}</span><span>${money(p.budget)}</span>${p.target_date && p.status !== 'completed' ? `<span>Target ${fmtDate(p.target_date)}</span>` : ''}${p.completed_date ? `<span>Completed ${fmtDate(p.completed_date)}</span>` : ''}</span></button>`;
+  const pIcon = s => ({ on_hold: 'alert', completed: 'check', in_progress: 'clock', design: 'edit' }[s] || 'note');
+  const pStatus = p => `<span class="status ${pClass(p.status)}">${icon(pIcon(p.status))} ${esc(pLabel(p.status))}</span>`;
+  function projectCard(p, withClient = false) {
+    const c = byId('clients', p.client_id), pr = progress(p);
+    return `<button class="project-card" type="button" data-action="edit-project" data-id="${p.id}">
+      <span class="pc-top"><span class="t">${esc(p.name)}</span>${pStatus(p)}</span>
+      ${withClient && c ? `<span class="proj-client">${avatar(c.name)}${esc(c.name)}</span>` : ''}
+      <span class="s"><span>${icon('money')} ${money(p.budget)}</span>${pr && p.status !== 'completed' ? `<span>${esc(pr.label)}</span>` : ''}${p.completed_date ? `<span>Completed ${fmtDate(p.completed_date)}</span>` : ''}</span>
+      ${pr ? progressBar(pr) + `<span class="p-dates"><span>${p.start_date ? fmtDate(p.start_date) : ''}</span><span>${p.target_date ? 'Target ' + fmtDate(p.target_date) : ''}</span></span>` : ''}
+    </button>`;
+  }
 
   let projFilter = 'active';
   function vProjects() {
     const f = p => projFilter === 'all' || (projFilter === 'active' ? p.status !== 'completed' : p.status === projFilter);
     const list = S.projects.filter(f).sort((a, b) => String(a.target_date || '9').localeCompare(String(b.target_date || '9')));
     const active = S.projects.filter(p => p.status !== 'completed');
-    return `<div class="page-head"><div><h1>Projects</h1><p>${active.length} active · ${money(active.reduce((s, p) => s + (Number(p.budget) || 0), 0))} in active budgets</p></div>
+    return `<div class="page-head"><div><p class="eyebrow">In progress</p><h1>Projects</h1><p>${active.length} active · ${money(active.reduce((s, p) => s + (Number(p.budget) || 0), 0))} in active budgets</p></div>
       <div class="head-actions"><button class="btn btn-primary" type="button" data-action="new-project">${icon('plus')} New project</button></div></div>
       <div class="chips" role="group" aria-label="Filter projects">${[['active', 'Active'], ...PSTATUS.map(s => [s.id, s.label]), ['all', 'All']].map(([v, l]) => `<button class="chip" type="button" data-projfilter="${v}" aria-pressed="${projFilter === v}">${l}<span>${S.projects.filter(p => v === 'all' || (v === 'active' ? p.status !== 'completed' : p.status === v)).length}</span></button>`).join('')}</div>
-      <div class="list">${list.map(p => {
-        const c = byId('clients', p.client_id);
-        return `<button class="row" type="button" data-action="edit-project" data-id="${p.id}"><span class="avatar">${esc(initials(c?.name))}</span><span class="grow"><span class="t">${esc(p.name)}</span><span class="s">${esc(c?.name || '')}${p.target_date && p.status !== 'completed' ? ' · target ' + fmtDate(p.target_date) : ''}</span></span>
-          <span class="r"><span class="status ${pClass(p.status)}">${icon(pIcon(p.status))} ${esc(pLabel(p.status))}</span><br><small>${money(p.budget)}</small></span></button>`;
-      }).join('') || '<p class="empty">No projects here.</p>'}</div>`;
+      ${list.length ? `<div class="proj-grid">${list.map(p => projectCard(p, true)).join('')}</div>` : `<div class="card">${empty('projects', 'No projects here', 'Projects are created from a client or with “New project”.')}</div>`}`;
+  }
+
+  // global search (topbar)
+  function gsearch(q) {
+    const box = $('.gresults'); if (!box) return;
+    q = q.trim().toLowerCase();
+    if (!q) { box.hidden = true; box.innerHTML = ''; return; }
+    const hit = o => [o.name, o.email, o.phone, o.project_type, o.address].some(v => String(v || '').toLowerCase().includes(q));
+    const leads = S.leads.filter(hit).slice(0, 5), clients = S.clients.filter(hit).slice(0, 4);
+    box.innerHTML = [...clients.map(c => `<a href="#/clients/${c.id}">${avatar(c.name)}<span>${esc(c.name)}<small>Client${c.address ? ' · ' + esc(c.address) : ''}</small></span></a>`),
+      ...leads.map(l => `<a href="#/leads/${l.id}">${avatar(l.name)}<span>${esc(l.name)}<small>Lead · ${esc(stageLabel(l.stage))} · ${esc(l.project_type || '')}</small></span></a>`)].join('') || `<div class="none">No matches for “${esc(q)}”.</div>`;
+    box.hidden = false;
   }
 
   // ---------- forms ----------
@@ -631,9 +712,10 @@
 
   // ---------- events (delegated) ----------
   app.addEventListener('click', async e => {
-    const a = e.target.closest('[data-action],[data-leadview],[data-stagefilter],[data-projfilter],[data-toggle-table],[data-task-del]');
+    const a = e.target.closest('[data-action],[data-leadview],[data-stagefilter],[data-projfilter],[data-toggle-table],[data-task-del],[data-step]');
     if (!a) return;
     const act = a.dataset.action, id = a.dataset.id;
+    if (a.dataset.step) { try { await changeStage(a.dataset.id, a.dataset.step); } catch (err) { handleErr(err); } return; }
     if (a.dataset.leadview) { leadView = a.dataset.leadview; history.replaceState(null, '', '#/leads'); return render(); }
     if (a.dataset.stagefilter) { leadStage = a.dataset.stagefilter; return render(); }
     if (a.dataset.projfilter) { projFilter = a.dataset.projfilter; return render(); }
@@ -644,6 +726,7 @@
       if (act === 'new-lead') leadForm();
       else if (act === 'edit-lead') leadForm(byId('leads', id));
       else if (act === 'convert') convertForm(byId('leads', id));
+      else if (act === 'mark-lost') lostForm(byId('leads', id));
       else if (act === 'del-lead') { const l = byId('leads', id); if (await confirmBox('Delete lead?', `${l.name} and their notes and tasks will be deleted. This can’t be undone.`)) { await remove('leads', id); toast('Lead deleted'); location.hash = '#/leads'; } }
       else if (act === 'new-client') clientForm();
       else if (act === 'edit-client') clientForm(byId('clients', id));
@@ -664,6 +747,7 @@
     } catch (err) { handleErr(err); }
   });
   app.addEventListener('input', e => {
+    if (e.target.matches('[data-gsearch]')) return gsearch(e.target.value);
     const s = e.target.dataset.search;
     if (!s) return;
     if (s === 'leads') leadQuery = e.target.value; else clientQuery = e.target.value;
@@ -682,10 +766,19 @@
       }
     } catch (err) { handleErr(err); }
   });
+  app.addEventListener('keydown', e => { if (e.key === 'Escape' && e.target.matches('[data-gsearch]')) { e.target.value = ''; gsearch(''); } });
+  app.addEventListener('focusout', e => { if (e.target.matches('[data-gsearch]')) setTimeout(() => { if (!document.activeElement?.closest('.gsearch')) gsearch(''); }, 150); });
+  function lostForm(l) {
+    openModal(`<form class="form-stack"><div class="modal-head"><h2>Mark as lost</h2><button class="icon-btn" type="button" data-close aria-label="Close">${icon('close')}</button></div>
+      <p class="modal-sub">${esc(l.name)} will move to <strong>Lost</strong>. You can reopen the lead anytime.</p>
+      <label class="field">Reason <small>(optional — helps spot patterns)</small><input name="reason" maxlength="300" placeholder="e.g. Chose another designer, budget, timing"></label>
+      <div class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-danger" type="submit">Mark as lost</button></div></form>`,
+    async d => { await update('leads', l.id, { lost_reason: clean(d.reason) }); closeModal(); await changeStage(l.id, 'lost'); });
+  }
   async function changeStage(id, stage) {
     const l = byId('leads', id); if (!l || l.stage === stage) return;
     await log(`Stage changed: ${stageLabel(l.stage)} → ${stageLabel(stage)}`, { lead_id: id }, 'stage');
-    await update('leads', id, { stage, ...(stage === 'won' || stage === 'lost' ? { next_follow_up: null } : {}) });
+    await update('leads', id, { stage, ...(stage === 'won' || stage === 'lost' ? { next_follow_up: null } : {}), ...(stage !== 'lost' && l.lost_reason ? { lost_reason: null } : {}) });
     toast(`Moved to ${stageLabel(stage)}`); render();
     if (stage === 'won' && !l.client_id) convertForm(byId('leads', id));
   }
@@ -712,14 +805,17 @@
   }
 
   // ---------- auth views ----------
-  const brand = '<div class="brand"><span class="brand-sub">Interiors by</span><span class="brand-name">JanLee</span><span class="brand-tag">Studio CRM</span></div>';
+  const brand = `<div class="brand">${MARK}<span class="brand-sub">Interiors by</span><span class="brand-name">JanLee</span><span class="brand-tag">Studio CRM</span></div>`;
+  const authWrap = inner => `<div class="auth"><div class="auth-photo"><img src="/assets/img/projects/emerald-and-indigo-mosaic-bath/cover-lg.webp" alt="" width="1600" height="1066"><div class="quote"><p>“Restoring the old while embracing the new.”</p><span>Interiors by JanLee · Colorado Springs</span></div></div><div class="auth-side">${inner}</div></div>`;
+  const authFoot = `<p class="auth-foot">${icon('lock')} Private, encrypted access for Interiors by JanLee</p>`;
   function vLogin(msg = '', ok = false) {
-    app.innerHTML = `<div class="auth"><form class="auth-card form-stack" id="login" novalidate>${brand}
+    app.innerHTML = authWrap(`<form class="auth-card form-stack" id="login" novalidate>${brand}
+      <div><h1 class="auth-title">Welcome back</h1><p class="auth-lead">Sign in to your studio dashboard.</p></div>
       <label class="field">Email<input name="email" type="email" autocomplete="username" required value="${esc(CFG.adminEmail || '')}"></label>
       <label class="field">Password<input name="password" type="password" autocomplete="current-password" required minlength="8"></label>
       <p class="auth-msg ${ok ? 'ok' : 'err'}" role="alert">${esc(msg)}</p>
       <button class="btn btn-primary btn-block" type="submit">Sign in</button>
-      <p class="auth-alt"><button class="linklike" type="button" id="forgot">Forgot password?</button></p></form></div>`;
+      <p class="auth-alt"><button class="linklike" type="button" id="forgot">Forgot password?</button></p>${authFoot}</form>`);
     const f = $('#login'), m = $('.auth-msg', f);
     let fails = 0;
     f.addEventListener('submit', async e => {
@@ -744,11 +840,11 @@
     };
   }
   function vSetPassword(token) {
-    app.innerHTML = `<div class="auth"><form class="auth-card form-stack" id="pw" novalidate>${brand}
-      <p>Choose a new password (at least 10 characters).</p>
+    app.innerHTML = authWrap(`<form class="auth-card form-stack" id="pw" novalidate>${brand}
+      <div><h1 class="auth-title">Set a new password</h1><p class="auth-lead">At least 10 characters.</p></div>
       <label class="field">New password<input name="p1" type="password" autocomplete="new-password" required minlength="10"></label>
       <label class="field">Confirm password<input name="p2" type="password" autocomplete="new-password" required minlength="10"></label>
-      <p class="auth-msg err" role="alert"></p><button class="btn btn-primary btn-block" type="submit">Save password</button></form></div>`;
+      <p class="auth-msg err" role="alert"></p><button class="btn btn-primary btn-block" type="submit">Save password</button>${authFoot}</form>`);
     const f = $('#pw'), m = $('.auth-msg', f);
     f.addEventListener('submit', async e => {
       e.preventDefault();
@@ -765,13 +861,17 @@
     const [name, id] = path.split('/');
     return { name, id, params: new URLSearchParams(qs || '') };
   }
+  let renderedKey = '', enterAnim = false;
   function render() {
     if (!DEMO && !auth.s) return vLogin();
-    if (!S.loaded) { app.innerHTML = '<div class="loading">Loading…</div>'; return; }
+    if (!S.loaded) { app.innerHTML = '<div class="skel-wrap" aria-label="Loading"><div class="skel h1"></div><div class="skel-row"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div><div class="skel big"></div></div>'; return; }
     const r = route();
     const views = { dashboard: vDashboard, leads: () => (r.id ? vLead(r.id) : vLeads(r.params)), tasks: vTasks, clients: () => (r.id ? vClient(r.id) : vClients()), projects: vProjects };
     const view = views[r.name] || vDashboard;
     const active = views[r.name] ? r.name : 'dashboard';
+    // play the entrance fade only when the page changes, not on data refreshes
+    const key = active + '/' + (r.id || '');
+    enterAnim = key !== renderedKey; renderedKey = key;
     app.innerHTML = shell(active, view());
     document.title = `${{ dashboard: 'Dashboard', leads: r.id ? byId('leads', r.id)?.name || 'Lead' : 'Leads', tasks: 'Tasks', clients: r.id ? byId('clients', r.id)?.name || 'Client' : 'Clients', projects: 'Projects' }[active]} · JanLee CRM`;
   }
@@ -783,9 +883,9 @@
     const h = new URLSearchParams(location.hash.slice(1));
     if (!DEMO && h.get('type') === 'recovery' && h.get('access_token')) return vSetPassword(h.get('access_token'));
     if (!DEMO && !auth.s) return vLogin();
-    app.innerHTML = '<div class="loading">Loading…</div>';
+    app.innerHTML = '<div class="skel-wrap" aria-label="Loading"><div class="skel h1"></div><div class="skel-row"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div><div class="skel big"></div></div>';
     try { await loadAll(); render(); }
-    catch (err) { if (err.message === 'signed_out') vLogin('Please sign in again.'); else { app.innerHTML = `<div class="auth"><div class="auth-card">${brand}<p class="auth-msg err">Couldn’t load your data: ${esc(err.message)}</p><button class="btn btn-ghost btn-block" type="button" id="retry">Try again</button></div></div>`; $('#retry').onclick = boot; } }
+    catch (err) { if (err.message === 'signed_out') vLogin('Please sign in again.'); else { app.innerHTML = authWrap(`<div class="auth-card form-stack">${brand}<p class="auth-msg err">Couldn’t load your data: ${esc(err.message)}</p><button class="btn btn-ghost btn-block" type="button" id="retry">Try again</button></div>`); $('#retry').onclick = boot; } }
   }
   // refresh data when returning to the tab (e.g. a new website enquiry arrived)
   document.addEventListener('visibilitychange', async () => { if (!document.hidden && S.loaded && (DEMO || auth.s) && !modal.open) { try { await loadAll(); render(); } catch {} } });
