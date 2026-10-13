@@ -236,6 +236,8 @@
       [['name', 80], ['email', 254], ['phone', 20], ['zip', 10], ['message', 2000]].forEach(([n, max]) => {
         const el = form.elements[n]; el.value = clean(el.value, n === 'message').slice(0, max);
       });
+      const pd = form.elements.phone.value.replace(/\D/g, '');
+      if (pd.length === 10) form.elements.phone.value = `(${pd.slice(0, 3)}) ${pd.slice(3, 6)}-${pd.slice(6)}`;
       // FormSubmit returns the visitor to our thank-you page on whatever domain they're on
       form.elements._next.value = `${location.origin}/thank-you/`;
       form.elements._url.value = location.href;
@@ -254,7 +256,13 @@ ${raw.message}`;
       // for regular posts that pass its reCAPTCHA step, which then redirects to /thank-you/.
       sending = true; btn.disabled = true; store.add(Date.now());
       say('', 'Sending… you’ll see a quick “I’m not a robot” check, then a confirmation page.');
-      HTMLFormElement.prototype.submit.call(form);
+      // friendly labels in the emails (FormSubmit uses each field's name as its label).
+      // "email" must keep its name for the auto-reply. The browser captures the data synchronously
+      // during submit(), so the original names are restored right after for our validation code.
+      const LABELS = { name: 'Full Name', phone: 'Phone Number', zip: 'Zip Code', project: 'Project Type', message: 'Project Details', consent: 'Agreed to Be Contacted' };
+      const renamed = Object.entries(LABELS).map(([key, label]) => { const el = form.elements[key]; el.name = label; return [el, key]; });
+      try { HTMLFormElement.prototype.submit.call(form); }
+      finally { renamed.forEach(([el, key]) => { el.name = key; }); }
       // if the browser stays on the page (offline, blocked), re-enable after a while
       setTimeout(() => { sending = false; btn.disabled = false; }, 15000);
     });

@@ -559,7 +559,7 @@ ${pageHero('Contact', 'Start Your Project Today', 'Questions? Ideas? Drop us a l
   <form class="form" id="contact-form" action="${esc(site.formEndpoint)}" method="POST" accept-charset="UTF-8" data-email="${site.email}" data-tel="${site.phoneHref}" data-phone="${site.phone}" novalidate>
     <h2 class="h3">Schedule Your Consultation</h2>
     <input type="hidden" name="_subject" value="New website inquiry — Interiors by JanLee">
-    <input type="hidden" name="_template" value="table">
+    <input type="hidden" name="_template" value="box">
     <input type="hidden" name="_next" value="${site.url}/thank-you/">
     <input type="hidden" name="_url" value="${site.url}/contact/">
     <input type="hidden" name="_autoresponse" value="${esc(site.autoresponse)}">
@@ -576,7 +576,7 @@ ${pageHero('Contact', 'Start Your Project Today', 'Questions? Ideas? Drop us a l
     <label><span class="lbl">Project type</span><select name="project">${opts.map(o => `<option>${o}</option>`).join('')}</select></label>
     <label><span class="lbl">Tell us about your project <span aria-hidden="true">*</span></span><textarea name="message" rows="5" required minlength="10" maxlength="2000" aria-describedby="err-message msg-count"></textarea><span class="field-meta"><small class="field-err" id="err-message"></small><small class="field-count" id="msg-count" aria-live="polite">0 / 2000</small></span></label>
     <p class="form-note">We care about your privacy. Please don’t submit sensitive information such as social security numbers, credit card or bank information.</p>
-    <label class="check"><input type="checkbox" name="consent" value="Yes — agreed to be contacted" required aria-describedby="err-consent"> <span>I agree that Interiors by JanLee can email and call me in response to my inquiry.</span></label><small class="field-err" id="err-consent"></small>
+    <label class="check"><input type="checkbox" name="consent" value="Yes" required aria-describedby="err-consent"> <span>I agree that Interiors by JanLee can email and call me in response to my inquiry.</span></label><small class="field-err" id="err-consent"></small>
     <button class="btn btn-dark btn-block" type="submit">Send Message ${icon('arrow')}</button>
     <p class="form-status" role="status" aria-live="polite"></p>
   </form>
