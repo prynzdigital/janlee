@@ -161,11 +161,17 @@
         const r = await fetch(endpoint, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         const j = await r.json().catch(() => ({}));
         // FormSubmit answers 200 with success "true"/"false"; only treat an explicit success as sent
-        if (!r.ok || String(j.success) !== 'true') throw new Error(j.message || r.status);
+        if (!r.ok || String(j.success) !== 'true') throw new Error(j.message || `HTTP ${r.status}`);
         thanks();
-      } catch {
+      } catch (err) {
+        // the service's reason (e.g. "This form needs Activation…") is logged for troubleshooting
+        console.warn('[contact form] not delivered:', err && err.message);
+        const activation = /activat/i.test(err && err.message || '');
         status.className = 'form-status err';
-        status.innerHTML = `Sorry, your message couldn’t be sent. Please email <a href="mailto:${form.dataset.email}">${form.dataset.email}</a> or call <a href="${form.dataset.tel}">${form.dataset.phone}</a>.`;
+        status.innerHTML = (activation
+          ? 'Our contact form is being activated and your message couldn’t be delivered yet. '
+          : 'Sorry, your message couldn’t be sent. ')
+          + `Please email <a href="mailto:${form.dataset.email}">${form.dataset.email}</a> or call <a href="${form.dataset.tel}">${form.dataset.phone}</a>.`;
       } finally { btn.disabled = false; }
     });
   }
