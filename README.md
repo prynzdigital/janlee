@@ -22,3 +22,7 @@ Then open http://localhost:8080
 1. **Contact form:** posts to FormSubmit (formsubmit.co, free), which emails each request to interiorsbyjanlee@gmail.com and sends the visitor an automatic confirmation (`autoresponse` in `build/content.mjs`). Visitors pass a quick reCAPTCHA on FormSubmit, then land on `/thank-you/`. FormSubmit only sends the confirmation for this standard (non-AJAX) submit with reCAPTCHA on — keep it that way.
 2. **Keep the URLs:** `/about/`, `/our-work/`, `/testimonials/`, `/contact/` and every `/projects/<id>-<name>/` page use the same addresses as the current Houzz site, so existing Google rankings and links carry over.
 3. After launch, submit `https://interiorsbyjanlee.com/sitemap.xml` in Google Search Console, and update the website link on the Google Business Profile.
+
+## CRM (`/admin/`)
+A private dashboard for leads, tasks, clients and projects. Website enquiries are saved automatically via `api/lead.js`.
+Runs in demo mode until connected — follow **[docs/CRM-SETUP.md](docs/CRM-SETUP.md)** (Supabase, free).

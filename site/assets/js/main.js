@@ -256,6 +256,19 @@ ${raw.message}`;
       // for regular posts that pass its reCAPTCHA step, which then redirects to /thank-you/.
       sending = true; btn.disabled = true; store.add(Date.now());
       say('', 'Sending… you’ll see a quick “I’m not a robot” check, then a confirmation page.');
+      // save the enquiry in JanLee's CRM first (never blocks the email: 2.5s cap, errors ignored)
+      try {
+        const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 2500);
+        await fetch('/api/lead', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true, signal: ctrl.signal, credentials: 'omit',
+          body: JSON.stringify({
+            name: form.elements.name.value, email: form.elements.email.value, phone: form.elements.phone.value,
+            zip: form.elements.zip.value, project: form.elements.project.value, message: form.elements.message.value,
+            consent: form.elements.consent.checked, _honey: form.elements._honey.value,
+          }),
+        }).catch(() => {});
+        clearTimeout(t);
+      } catch {}
       // friendly labels in the emails (FormSubmit uses each field's name as its label).
       // "email" must keep its name for the auto-reply. The browser captures the data synchronously
       // during submit(), so the original names are restored right after for our validation code.

@@ -1,4 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /thank-you/
 
 Sitemap: https://interiorsbyjanlee.com/sitemap.xml

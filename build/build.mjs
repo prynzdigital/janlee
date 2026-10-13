@@ -638,7 +638,7 @@ ${Object.keys(pages).filter(u => u !== '/privacy/' && u !== '/thank-you/').map(u
 }).join('\n')}
 </urlset>
 `);
-fs.writeFileSync(path.join(OUT, 'robots.txt'), `User-agent: *\nAllow: /\n\nSitemap: ${site.url}/sitemap.xml\n`);
+fs.writeFileSync(path.join(OUT, 'robots.txt'), `User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /api/\nDisallow: /thank-you/\n\nSitemap: ${site.url}/sitemap.xml\n`);
 fs.writeFileSync(path.join(OUT, 'site.webmanifest'), JSON.stringify({ name: site.name, short_name: 'JanLee', start_url: '/', display: 'standalone', background_color: '#F7F2EA', theme_color: '#F7F2EA', icons: [{ src: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }, { src: '/assets/img/brand/icon-512.png', sizes: '512x512', type: 'image/png' }] }, null, 1));
 fs.writeFileSync(path.join(ROOT, 'build', 'og-list.json'), JSON.stringify(projects.map(p => ({ slug: p.slug, name: p.photos[0].name }))));
 console.log(`Built ${Object.keys(pages).length} pages, ${projects.length} projects, ${totalPhotos} photos, ${reviews.length} reviews.`);
