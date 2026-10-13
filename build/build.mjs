@@ -74,7 +74,7 @@ const ldBusiness = {
   name: site.name, alternateName: 'Interiors By Janlee', url: site.url + '/',
   logo: site.url + '/assets/img/brand/logo.png', image: site.url + '/assets/img/og/home.jpg',
   description: 'Full-service interior design and remodeling firm in Colorado Springs, CO, established in 2011. Interior design, kitchen and bathroom renovations, home remodeling, color consultations and furniture repurposing.',
-  telephone: '+1-719-415-3456', email: site.email, foundingDate: String(site.founded), priceRange: '$$',
+  telephone: '+1-719-930-5245', email: site.email, foundingDate: String(site.founded), priceRange: '$$',
   address: { '@type': 'PostalAddress', addressLocality: site.city, addressRegion: site.region, addressCountry: 'US' },
   geo: { '@type': 'GeoCoordinates', latitude: 38.8339, longitude: -104.8214 },
   areaServed: { '@type': 'City', name: 'Colorado Springs' },
@@ -556,8 +556,12 @@ ${pageHero('Contact', 'Start Your Project Today', 'Questions? Ideas? Drop us a l
     </ul>
     <div class="map"><iframe title="Map of Colorado Springs, CO" src="https://www.google.com/maps?q=Colorado+Springs,+CO&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
   </div>
-  <form class="form" id="contact-form" data-endpoint="${esc(site.formEndpoint)}" data-email="${site.email}" novalidate>
+  <form class="form" id="contact-form" data-endpoint="${esc(site.formEndpoint)}" data-email="${site.email}" data-tel="${site.phoneHref}" data-phone="${site.phone}" novalidate>
     <h2 class="h3">Schedule Your Consultation</h2>
+    <input type="hidden" name="_subject" value="New website inquiry — Interiors by JanLee">
+    <input type="hidden" name="_template" value="table">
+    <input type="hidden" name="_captcha" value="false">
+    <p class="hp" aria-hidden="true"><label>Leave this field empty<input type="text" name="_honey" tabindex="-1" autocomplete="off"></label></p>
     <div class="form-row">
       <label><span class="lbl">Name <span aria-hidden="true">*</span></span><input name="name" autocomplete="name" required></label>
       <label><span class="lbl">Email <span aria-hidden="true">*</span></span><input name="email" type="email" autocomplete="email" required></label>

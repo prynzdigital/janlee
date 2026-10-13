@@ -3,14 +3,15 @@
 export const site = {
   name: 'Interiors by JanLee',
   url: 'https://interiorsbyjanlee.com',
-  phone: '(719) 415-3456',
-  phoneHref: 'tel:+17194153456',
+  phone: '(719) 930-5245',
+  phoneHref: 'tel:+17199305245',
   email: 'interiorsbyjanlee@gmail.com',
   city: 'Colorado Springs',
   region: 'CO',
   founded: 2011,
-  // Set to a form endpoint (e.g. https://formspree.io/f/xxxx) to POST the contact form; empty = opens the visitor's email app.
-  formEndpoint: '',
+  // Contact form delivery via FormSubmit (free, no account). The first submission triggers a one-time
+  // "Activate form" email to this inbox; submissions are delivered after it is clicked.
+  formEndpoint: 'https://formsubmit.co/ajax/interiorsbyjanlee@gmail.com',
 };
 
 export const categories = [

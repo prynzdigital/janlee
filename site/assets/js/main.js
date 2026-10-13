@@ -147,19 +147,26 @@
       });
       if (bad) { status.className = 'form-status err'; status.textContent = 'Please complete the highlighted fields.'; bad.focus(); return; }
       const data = Object.fromEntries(new FormData(form));
-      const endpoint = form.dataset.endpoint;
-      if (endpoint) {
-        status.className = 'form-status'; status.textContent = 'Sending…';
-        try {
-          const r = await fetch(endpoint, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-          if (!r.ok) throw 0;
-          form.reset(); status.className = 'form-status ok'; status.textContent = 'Thank you! We’ll be in touch within 1 business day.';
-        } catch { status.className = 'form-status err'; status.textContent = `Sorry, something went wrong. Please email ${form.dataset.email}.`; }
-      } else {
+      const thanks = () => { form.reset(); status.className = 'form-status ok'; status.textContent = 'Thank you! Your message has been sent — we’ll be in touch within 1 business day.'; };
+      if (data._honey) return thanks(); // bot filled the hidden trap field: drop silently
+      const mailto = () => {
         const body = `Name: ${data.name}\nEmail: ${data.email}\nPhone: ${data.phone}\nZip: ${data.zip || ''}\nProject: ${data.project}\n\n${data.message}`;
         location.href = `mailto:${form.dataset.email}?subject=${encodeURIComponent('Design consultation request — ' + data.name)}&body=${encodeURIComponent(body)}`;
-        status.className = 'form-status ok'; status.textContent = 'Opening your email app to send your message…';
-      }
+      };
+      const endpoint = form.dataset.endpoint;
+      if (!endpoint) { mailto(); status.className = 'form-status ok'; status.textContent = 'Opening your email app to send your message…'; return; }
+      const btn = $('button[type=submit]', form);
+      btn.disabled = true; status.className = 'form-status'; status.textContent = 'Sending…';
+      try {
+        const r = await fetch(endpoint, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+        const j = await r.json().catch(() => ({}));
+        // FormSubmit answers 200 with success "true"/"false"; only treat an explicit success as sent
+        if (!r.ok || String(j.success) !== 'true') throw new Error(j.message || r.status);
+        thanks();
+      } catch {
+        status.className = 'form-status err';
+        status.innerHTML = `Sorry, your message couldn’t be sent. Please email <a href="mailto:${form.dataset.email}">${form.dataset.email}</a> or call <a href="${form.dataset.tel}">${form.dataset.phone}</a>.`;
+      } finally { btn.disabled = false; }
     });
   }
 })();

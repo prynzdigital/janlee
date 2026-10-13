@@ -618,3 +618,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   .collage .since strong { font-size: 1.6rem; }
   .collage .since span { font-size: .7rem; }
 }
+/* spam honeypot: visually hidden, skipped by keyboard and screen readers */
+.form .hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.form button[disabled] { opacity: .6; cursor: progress; }
+.form-status a { color: inherit; font-weight: 500; }
