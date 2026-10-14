@@ -42,6 +42,9 @@
     stage: '<path d="M5 16h18M17 9l7 7-7 7"/>', alert: '<path d="M16 4 2 28h28z"/><path d="M16 13v7M16 24v.5"/>', clock: '<circle cx="16" cy="16" r="12"/><path d="M16 9v7l5 3"/>',
     check: '<path d="m7 16 6 6 12-13"/>', out: '<path d="M13 6H6v20h7M20 10l6 6-6 6M26 16H12"/>', site: '<circle cx="16" cy="16" r="12"/><path d="M4 16h24M16 4c4 4 4 20 0 24M16 4c-4 4-4 20 0 24"/>',
     dl: '<path d="M16 4v16M9 13l7 7 7-7M5 26h22"/>',
+    chev: '<path d="m12 8 8 8-8 8"/>',
+    user: '<circle cx="16" cy="11" r="6"/><path d="M5 28c1.5-6 6-9 11-9s9.5 3 11 9"/>',
+    key: '<circle cx="10" cy="20" r="6"/><path d="m14.5 15.5 11-11M21 9l3 3M18 12l3 3"/>',
     search: '<circle cx="14" cy="14" r="9"/><path d="m21 21 7 7"/>',
     list: '<path d="M11 8h16M11 16h16M11 24h16M5 8h.01M5 16h.01M5 24h.01"/>',
     money: '<rect x="3" y="8" width="26" height="16" rx="3"/><circle cx="16" cy="16" r="3.5"/><path d="M7 12v.01M25 20v.01"/>',
@@ -70,7 +73,11 @@
   };
   const money = n => n == null || n === '' ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(n));
   const compact = n => n >= 1e6 ? '$' + (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e4 ? '$' + Math.round(n / 1e3) + 'K' : money(n);
-  const initials = n => { const w = String(n || '?').split(/\s+/).filter(Boolean); return ((w[0] || '?')[0] + (w.length > 1 ? w[w.length - 1][0] : '')).toUpperCase(); };
+  const initials = n => {
+    const w = String(n || '?').split(/\s+/).filter(Boolean);
+    if (w.length === 1) { const caps = w[0].match(/[A-Z]/g) || []; return (caps.length > 1 ? caps[0] + caps[1] : w[0][0]).toUpperCase(); } // "JanLee" -> "JL"
+    return (w[0][0] + w[w.length - 1][0]).toUpperCase();
+  };
   function dueBadge(due) {
     if (!due) return '';
     const t = today();
@@ -145,6 +152,12 @@
     },
     async signOut() { try { if (this.s) await this.call('logout', {}, this.s.access_token); } catch {} this.save(null); },
     recover: email => auth.call('recover', { email, redirect_to: `${location.origin}/admin/` }),
+    // re-check the current password before allowing a change
+    async changePassword(current, next) {
+      const email = this.s?.email || CFG.adminEmail;
+      await this.call('token?grant_type=password', { email, password: current }).catch(() => { throw new Error('Your current password is incorrect.'); });
+      await this.call('user', { password: next }, await this.token());
+    },
   };
 
   // ---------- data layer ----------
@@ -359,8 +372,7 @@
           <a href="${esc(IG)}" target="_blank" rel="noopener">${icon('ig')} Instagram</a>
           ${DEMO ? `<a href="#" data-action="reset-demo">${icon('star')} Reset demo data</a>` : ''}
         </div>
-        <div class="side-user">${avatar('Jan Lee')}<div><strong>JanLee</strong><small>${who}</small></div>
-          ${DEMO ? '' : `<button class="icon-btn" type="button" data-action="signout" aria-label="Sign out">${icon('out')}</button>`}</div>
+        <button class="side-user" type="button" data-action="account" aria-haspopup="dialog">${avatar(profile().name)}<div><strong>${esc(profile().name)}</strong><small>${who}</small></div>${icon('chev')}</button>
       </aside>
       <div>
         ${DEMO ? `<div class="demo-banner">${icon('star')}<span><strong>Demo mode</strong> — sample data stored only in this browser.</span></div>` : ''}
@@ -370,7 +382,7 @@
           <span class="spacer"></span>
           <a class="icon-btn m-only" href="${esc(IG)}" target="_blank" rel="noopener" aria-label="Instagram (opens in a new tab)">${icon('ig')}</a>
           <button class="btn btn-primary btn-sm" type="button" data-action="new-lead">${icon('plus')} Lead</button>
-          ${DEMO ? `<button class="icon-btn m-only" type="button" data-action="reset-demo" aria-label="Reset demo data">${icon('star')}</button>` : `<button class="icon-btn m-only" type="button" data-action="signout" aria-label="Sign out">${icon('out')}</button>`}
+          <button class="account-btn" type="button" data-action="account" aria-haspopup="dialog" aria-label="Account: profile, password and sign out">${avatar(profile().name)}</button>
         </header>
         <main class="main${enterAnim ? ' enter' : ''}" id="main">${inner}</main>
       </div>
@@ -735,6 +747,7 @@
       else if (act === 'edit-project') projectForm(byId('projects', id));
       else if (act === 'new-task') taskForm();
       else if (act === 'export') exportCsv();
+      else if (act === 'account') accountSheet();
       else if (act === 'signout') { await auth.signOut(); location.hash = ''; render(); }
       else if (act === 'reset-demo') { if (await confirmBox('Reset demo data?', 'This restores the original sample data in this browser.', 'Reset')) { demo.reset(); await loadAll(); toast('Demo data reset'); render(); } }
     } catch (err) { handleErr(err); }
@@ -768,6 +781,88 @@
   });
   app.addEventListener('keydown', e => { if (e.key === 'Escape' && e.target.matches('[data-gsearch]')) { e.target.value = ''; gsearch(''); } });
   app.addEventListener('focusout', e => { if (e.target.matches('[data-gsearch]')) setTimeout(() => { if (!document.activeElement?.closest('.gsearch')) gsearch(''); }, 150); });
+  // ---------- account: profile, password, sign out ----------
+  const PKEY = 'jl-crm-profile';
+  function profile() {
+    let p = {}; try { p = JSON.parse(localStorage.getItem(PKEY) || '{}'); } catch {}
+    return { name: p.name || 'JanLee', title: p.title || 'Owner & Lead Designer', phone: p.phone || '(719) 930-5245' };
+  }
+  const acctEmail = () => (DEMO ? CFG.adminEmail : auth.s?.email || CFG.adminEmail) || '';
+  function accountSheet() {
+    const p = profile(), email = acctEmail();
+    const item = (act, ic, label, sub = '', cls = '') => `<button type="button" class="menu-item ${cls}" data-acct="${act}">${icon(ic)}<span class="mi-txt"><span class="t">${label}</span>${sub ? `<span class="s">${sub}</span>` : ''}</span>${cls ? '' : icon('chev', 'ic chev')}</button>`;
+    const link = (href, ic, label, sub = '') => `<a class="menu-item" href="${esc(href)}" target="_blank" rel="noopener">${icon(ic)}<span class="mi-txt"><span class="t">${label}</span>${sub ? `<span class="s">${sub}</span>` : ''}</span>${icon('chev', 'ic chev')}</a>`;
+    openModal(`<div class="acct">
+      <div class="acct-close"><button class="icon-btn" type="button" data-close aria-label="Close">${icon('close')}</button></div>
+      <div class="acct-head">${avatar(p.name, 'lg')}<div><h2>${esc(p.name)}</h2><p>${esc(p.title)}</p><p class="acct-mail">${esc(email)}</p>
+        <span class="status ${DEMO ? 'status-warn' : 'status-good'}">${icon(DEMO ? 'star' : 'lock')} ${DEMO ? 'Demo mode' : 'Signed in securely'}</span></div></div>
+      <p class="menu-label">Account</p>
+      <div class="menu">${item('profile', 'user', 'Profile', 'Name, title and phone')}${item('password', 'key', 'Change password', 'Update your sign-in password')}${item('reset', 'mail', 'Send password reset link', 'Emails a secure link to ' + esc(email))}</div>
+      <p class="menu-label">Shortcuts</p>
+      <div class="menu">${item('export', 'dl', 'Export leads (CSV)', 'Opens in Excel or Google Sheets')}${link('/', 'site', 'View website')}${link(IG, 'ig', 'Instagram', '@interiorsbyjanlee')}${DEMO ? item('reset-demo', 'star', 'Reset demo data', 'Restore the sample data') : ''}</div>
+      <div class="menu">${item('signout', 'out', 'Sign out', '', 'danger')}</div>
+    </div>`);
+    $$('[data-acct]', modalBody).forEach(b => b.addEventListener('click', async () => {
+      const act = b.dataset.acct;
+      try {
+        if (act === 'profile') profileForm();
+        else if (act === 'password') passwordForm();
+        else if (act === 'reset') {
+          if (DEMO) return toast('Password reset works once the CRM is connected.', true);
+          await auth.recover(email).catch(() => {});
+          closeModal(); toast(`Reset link sent to ${email}`);
+        }
+        else if (act === 'export') { closeModal(); exportCsv(); }
+        else if (act === 'reset-demo') { if (await confirmBox('Reset demo data?', 'This restores the original sample data in this browser.', 'Reset')) { demo.reset(); await loadAll(); toast('Demo data reset'); render(); } }
+        else if (act === 'signout') {
+          if (DEMO) return toast('There’s no account to sign out of in demo mode.', true);
+          if (await confirmBox('Sign out?', 'You’ll need your password to sign back in.', 'Sign out')) { await auth.signOut(); location.hash = ''; render(); }
+        }
+      } catch (err) { handleErr(err); }
+    }));
+  }
+  function profileForm() {
+    const p = profile();
+    openModal(`<form class="form-stack"><div class="modal-head"><h2>Profile</h2><button class="icon-btn" type="button" data-close aria-label="Close">${icon('close')}</button></div>
+      <p class="modal-sub">How you appear in the CRM.</p>
+      <label class="field">Display name<input name="name" required maxlength="60" value="${esc(p.name)}"></label>
+      <label class="field">Title<input name="title" maxlength="80" value="${esc(p.title)}"></label>
+      <label class="field">Business phone<input name="phone" type="tel" maxlength="30" value="${esc(p.phone)}"></label>
+      <label class="field">Sign-in email <small>(used to sign in and for reset links)</small><input value="${esc(acctEmail())}" disabled></label>
+      <div class="modal-foot"><button class="btn btn-ghost" type="button" data-back>Back</button><button class="btn btn-primary" type="submit">Save profile</button></div></form>`,
+    async d => {
+      if (!clean(d.name)) throw new Error('Please enter a display name.');
+      try { localStorage.setItem(PKEY, JSON.stringify({ name: clean(d.name), title: clean(d.title), phone: clean(d.phone) })); } catch {}
+      closeModal(); toast('Profile saved'); render();
+    });
+    $('[data-back]', modalBody).onclick = accountSheet;
+  }
+  function passwordForm() {
+    openModal(`<form class="form-stack" novalidate><div class="modal-head"><h2>Change password</h2><button class="icon-btn" type="button" data-close aria-label="Close">${icon('close')}</button></div>
+      <p class="modal-sub">Use at least 12 characters — a short phrase is easiest to remember.</p>
+      <label class="field">Current password<input name="cur" type="password" autocomplete="current-password" required></label>
+      <label class="field">New password<input name="p1" type="password" autocomplete="new-password" required minlength="12"></label>
+      <div class="pw-meter" data-score="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div><p class="pw-hint" aria-live="polite"></p>
+      <label class="field">Confirm new password<input name="p2" type="password" autocomplete="new-password" required minlength="12"></label>
+      <div class="modal-foot"><button class="btn btn-ghost" type="button" data-back>Back</button><button class="btn btn-primary" type="submit">Update password</button></div></form>`,
+    async d => {
+      if (DEMO) throw new Error('Password changes work once the CRM is connected.');
+      if (!d.cur) throw new Error('Enter your current password.');
+      if (d.p1.length < 12) throw new Error('New password must be at least 12 characters.');
+      if (d.p1 !== d.p2) throw new Error('New passwords don’t match.');
+      if (d.p1 === d.cur) throw new Error('Choose a password different from your current one.');
+      await auth.changePassword(d.cur, d.p1);
+      closeModal(); toast('Password updated');
+    });
+    const f = $('form', modalBody), meterBox = $('.pw-meter', f), hint = $('.pw-hint', f);
+    f.p1.addEventListener('input', () => {
+      const v = f.p1.value;
+      const score = v.length < 12 ? (v ? 1 : 0) : [true, /[a-z]/.test(v) && /[A-Z]/.test(v), /\d/.test(v), /[^A-Za-z0-9]/.test(v) || v.length >= 16].filter(Boolean).length;
+      meterBox.dataset.score = score;
+      hint.textContent = v ? ['', v.length < 12 ? 'Too short — at least 12 characters' : 'Weak', 'Fair', 'Good', 'Strong'][score] : '';
+    });
+    $('[data-back]', modalBody).onclick = accountSheet;
+  }
   function lostForm(l) {
     openModal(`<form class="form-stack"><div class="modal-head"><h2>Mark as lost</h2><button class="icon-btn" type="button" data-close aria-label="Close">${icon('close')}</button></div>
       <p class="modal-sub">${esc(l.name)} will move to <strong>Lost</strong>. You can reopen the lead anytime.</p>
