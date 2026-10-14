@@ -813,7 +813,7 @@
     const projSelect = key === 'client_id' && projectsOfClient.length
       ? `<select class="input file-target" data-file-target aria-label="Attach to"><option value="">Attach to client</option>${projectsOfClient.map(p => `<option value="${p.id}">Project · ${esc(p.name)}</option>`).join('')}</select>` : '';
     return `${cardHead('note', 'Files', 'Photos, plans, contracts — up to 4 MB each', '')}
-      ${DEMO ? empty('note', 'File uploads', 'Available once the CRM is connected to its database.') : `
+      ${DEMO ? empty('note', 'File uploads', 'Available once the CRM is connected to its database.') : S.filesReady === false ? empty('note', 'File storage not connected', 'Connect the Vercel Blob store to this project, then redeploy.') : `
       <div class="file-bar">${projSelect}<label class="btn btn-ghost btn-sm file-pick">${icon('plus')} Upload<input type="file" multiple data-upload='${esc(JSON.stringify(ref))}' accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.doc,.docx,.xls,.xlsx,.txt" class="sr"></label></div>
       <p class="upload-status" aria-live="polite"></p>
       ${list.length ? `<div class="file-grid">${list.map(f => {
@@ -1118,7 +1118,7 @@
     const m = await auth.me();
     if (!m) DEMO = true;                                   // no API here (local preview) → demo
     else if (!m.configured) return vSetup(m.missing || []);
-    else { DEMO = false; if (!m.authenticated) return vLogin(); if (m.mustChange) return vFirstPassword(); auth.s = { email: m.email }; S.profile = m.profile || null; }
+    else { DEMO = false; if (!m.authenticated) return vLogin(); if (m.mustChange) return vFirstPassword(); auth.s = { email: m.email }; S.profile = m.profile || null; S.filesReady = m.files !== false; }
     app.innerHTML = '<div class="skel-wrap" aria-label="Loading"><div class="skel h1"></div><div class="skel-row"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div><div class="skel big"></div></div>';
     try { await loadAll(); render(); }
     catch (err) { if (err.message === 'signed_out') vLogin('Please sign in again.'); else { app.innerHTML = authWrap(`<div class="auth-card form-stack">${brand}<p class="auth-msg err">Couldn’t load your data: ${esc(err.message)}</p><button class="btn btn-ghost btn-block" type="button" id="retry">Try again</button></div>`); $('#retry').onclick = boot; } }
