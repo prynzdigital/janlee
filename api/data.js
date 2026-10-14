@@ -70,7 +70,7 @@ module.exports = async (req, res) => {
     if (op === 'delete') {
       const blobs = await blobsFor(table, id);
       await core.q(`delete from ${table} where id = $1`, [id]);
-      if (blobs.length && process.env.BLOB_READ_WRITE_TOKEN) await del(blobs.map(b => b.blob_url)).catch(e => console.error('blob cleanup', e));
+      if (blobs.length && core.blobConfigured()) await del(blobs.map(b => b.blob_url), core.blobAuth(req)).catch(e => console.error('blob cleanup', e));
       return core.send(res, 200, { ok: true });
     }
     return core.send(res, 400, { ok: false, error: 'unknown_op' });

@@ -20,7 +20,7 @@ Opened locally without the API (e.g. `python -m http.server`), it runs in **demo
 | Name | Set by | Notes |
 |---|---|---|
 | `DATABASE_URL` | Neon integration (automatic) | secret |
-| `BLOB_READ_WRITE_TOKEN` | Blob store connection (automatic) | secret |
+| `BLOB_READ_WRITE_TOKEN` **or** `BLOB_STORE_ID` | Blob store connection (automatic) | older stores add the token; newer ones add the store ID and sign in with Vercel OIDC — either works |
 | `ADMIN_PASSWORD` | you | JanLee's sign-in password, 12+ characters |
 | `SESSION_SECRET` | you | any long random string (40+ characters); changing it signs everyone out |
 | `ADMIN_EMAIL` | optional | defaults to `interiorsbyjanlee@gmail.com` |

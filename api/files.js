@@ -31,7 +31,7 @@ module.exports = async (req, res) => {
   try {
     const url = new URL(req.url, 'https://x');
     const p = url.searchParams;
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    if (!core.blobConfigured()) {
       if (!(await core.requireAuth(req, res))) return;
       return core.send(res, 503, { ok: false, error: 'blob_not_configured' });
     }
@@ -41,7 +41,7 @@ module.exports = async (req, res) => {
       if (!UUID.test(p.get('id') || '')) return core.send(res, 400, { ok: false, error: 'bad_id' });
       const [f] = await core.q('select * from files where id = $1', [p.get('id')]);
       if (!f) return core.send(res, 404, { ok: false, error: 'not_found' });
-      const r = await get(f.blob_url, { access: f.access });
+      const r = await get(f.blob_url, { access: f.access, ...core.blobAuth(req) });
       if (!r || r.statusCode !== 200) return core.send(res, 404, { ok: false, error: 'not_found' });
       const inline = !p.get('download') && /^(image\/(jpeg|png|webp|gif)|application\/pdf)$/.test(f.content_type);
       res.setHeader('Content-Type', f.content_type);
@@ -69,10 +69,11 @@ module.exports = async (req, res) => {
       if (!/\.[a-z0-9]{2,5}$/i.test(name)) name += '.' + TYPES[type];
       const pathname = `crm/${ref.replace('_id', '')}/${p.get(ref)}/${crypto.randomUUID()}-${name}`;
       let access = process.env.BLOB_ACCESS === 'public' ? 'public' : 'private', blob;
-      try { blob = await put(pathname, buf, { access, contentType: type, addRandomSuffix: true }); }
+      const auth = core.blobAuth(req);
+      try { blob = await put(pathname, buf, { access, contentType: type, addRandomSuffix: true, ...auth }); }
       catch (e) {
         // the store was created as public: fall back (URLs stay unguessable and are only shown via this API)
-        if (access === 'private' && (e instanceof BlobAccessError || /access/i.test(e.message))) { access = 'public'; blob = await put(pathname, buf, { access, contentType: type, addRandomSuffix: true }); }
+        if (access === 'private' && (e instanceof BlobAccessError || /access/i.test(e.message))) { access = 'public'; blob = await put(pathname, buf, { access, contentType: type, addRandomSuffix: true, ...auth }); }
         else throw e;
       }
       const [row] = await core.q(
@@ -86,7 +87,7 @@ module.exports = async (req, res) => {
       if (!(await core.requireAuth(req, res, { write: true }))) return;
       if (!UUID.test(p.get('id') || '')) return core.send(res, 400, { ok: false, error: 'bad_id' });
       const [f] = await core.q('delete from files where id = $1 returning blob_url', [p.get('id')]);
-      if (f) await del(f.blob_url).catch(e => console.error('blob delete', e));
+      if (f) await del(f.blob_url, core.blobAuth(req)).catch(e => console.error('blob delete', e));
       return core.send(res, 200, { ok: true });
     }
     res.setHeader('Allow', 'GET, POST, DELETE');

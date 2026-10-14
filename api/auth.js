@@ -12,7 +12,7 @@ module.exports = async (req, res) => {
       if (miss.length) return core.send(res, 200, { ok: true, configured: false, missing: miss });
       const s = await core.currentSession(req);
       const profile = s ? { ...DEFAULT_PROFILE, ...((await core.getSetting('profile')) || {}) } : null;
-      return core.send(res, 200, { ok: true, configured: true, authenticated: !!s, mustChange: !!s?.temp, email: s ? core.ADMIN_EMAIL() : null, profile: s?.temp ? null : profile, files: s ? !!process.env.BLOB_READ_WRITE_TOKEN : undefined });
+      return core.send(res, 200, { ok: true, configured: true, authenticated: !!s, mustChange: !!s?.temp, email: s ? core.ADMIN_EMAIL() : null, profile: s?.temp ? null : profile, files: s ? core.blobConfigured() : undefined });
     }
     if (req.method !== 'POST') { res.setHeader('Allow', 'GET, POST'); return core.send(res, 405, { ok: false }); }
     if (miss.length) return core.send(res, 503, { ok: false, error: 'not_configured', missing: miss });
