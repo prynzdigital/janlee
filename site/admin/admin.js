@@ -1,10 +1,11 @@
 /* JanLee CRM — single-page admin (no dependencies).
-   Data: Supabase (Postgres + Auth) via its REST API, protected by Row Level Security.
-   Without config it runs in DEMO mode on sample data kept in this browser only. */
+   Data: Neon Postgres + Vercel Blob through the site's own API (/api/auth, /api/data, /api/files).
+   Sign-in uses an HttpOnly session cookie set by the server. When the API isn't available
+   (e.g. local preview) it runs in DEMO mode on sample data kept in this browser only. */
 (() => {
   'use strict';
   const CFG = window.CRM_CONFIG || {};
-  const DEMO = !CFG.supabaseUrl || !CFG.supabaseAnonKey;
+  let DEMO = true; // decided in boot() by asking the API
   const IG = CFG.instagram || 'https://www.instagram.com/interiorsbyjanlee/';
   const $ = (s, c = document) => c.querySelector(s);
   const $$ = (s, c = document) => [...c.querySelectorAll(s)];
@@ -121,63 +122,59 @@
   const clean = v => { const s = String(v ?? '').trim(); return s === '' ? null : s; };
   const num = v => { const s = String(v ?? '').replace(/[$,\s]/g, ''); return s === '' ? null : Math.max(0, Number(s)) || 0; };
 
-  // ---------- auth (Supabase GoTrue REST) ----------
-  const SKEY = 'jl-crm-session';
-  const auth = {
-    s: (() => { try { return JSON.parse(localStorage.getItem(SKEY) || 'null'); } catch { return null; } })(),
-    save(s) { this.s = s; try { s ? localStorage.setItem(SKEY, JSON.stringify(s)) : localStorage.removeItem(SKEY); } catch {} },
-    async call(path, body, token) {
-      const r = await fetch(`${CFG.supabaseUrl}/auth/v1/${path}`, {
-        method: body === undefined ? 'GET' : (path === 'user' ? 'PUT' : 'POST'),
-        headers: { apikey: CFG.supabaseAnonKey, 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error_description || j.msg || j.message || 'Sign-in failed');
-      return j;
-    },
-    store(j) { this.save({ access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + (j.expires_in || 3600) * 1000, email: j.user?.email }); },
-    async signIn(email, password) {
-      const j = await this.call('token?grant_type=password', { email, password });
-      if (CFG.adminEmail && String(j.user?.email).toLowerCase() !== CFG.adminEmail.toLowerCase()) throw new Error('This account does not have access.');
-      this.store(j);
-    },
-    async token() {
-      if (!this.s) throw new Error('signed_out');
-      if (Date.now() > this.s.expires_at - 60e3) {
-        try { this.store(await this.call('token?grant_type=refresh_token', { refresh_token: this.s.refresh_token })); }
-        catch { this.save(null); throw new Error('signed_out'); }
-      }
-      return this.s.access_token;
-    },
-    async signOut() { try { if (this.s) await this.call('logout', {}, this.s.access_token); } catch {} this.save(null); },
-    recover: email => auth.call('recover', { email, redirect_to: `${location.origin}/admin/` }),
-    // re-check the current password before allowing a change
-    async changePassword(current, next) {
-      const email = this.s?.email || CFG.adminEmail;
-      await this.call('token?grant_type=password', { email, password: current }).catch(() => { throw new Error('Your current password is incorrect.'); });
-      await this.call('user', { password: next }, await this.token());
-    },
+  // ---------- API client (same-origin; session is an HttpOnly cookie) ----------
+  const ERR = {
+    invalid: 'Some details aren’t valid — please check and try again.',
+    rate_limited: 'Too many attempts. Please wait 15 minutes and try again.',
+    wrong_password: 'Your current password is incorrect.',
+    weak_password: 'Use at least 12 characters.',
+    too_large: 'That file is over 4 MB.',
+    type_not_allowed: 'That file type isn’t supported (images, PDF, Word, Excel or text).',
+    blob_not_configured: 'File storage isn’t connected yet.',
+    origin: 'Security check failed — please reload the page.',
+    not_configured: 'The CRM isn’t fully set up yet.',
+    not_found: 'That item no longer exists.',
   };
+  async function api(path, { method = 'GET', body, raw, type } = {}) {
+    const r = await fetch(path, {
+      method, credentials: 'same-origin', cache: 'no-store',
+      headers: method === 'GET' ? {} : { 'X-CRM': '1', 'Content-Type': raw ? type : 'application/json' },
+      body: raw || (body === undefined ? undefined : JSON.stringify(body)),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401 && j.error === 'signed_out') { auth.s = null; throw Object.assign(new Error('signed_out'), { code: 'signed_out' }); }
+    if (!r.ok || j.ok === false) throw Object.assign(new Error(ERR[j.error] || `Request failed (${r.status})`), { code: j.error });
+    return j;
+  }
+  const auth = {
+    s: null, // { email } while signed in
+    async me() {
+      try {
+        const r = await fetch('/api/auth', { credentials: 'same-origin', cache: 'no-store' });
+        if (!r.ok || !(r.headers.get('content-type') || '').includes('json')) return null;
+        return await r.json();
+      } catch { return null; }
+    },
+    async signIn(email, password) {
+      try { await api('/api/auth', { method: 'POST', body: { op: 'login', email, password } }); }
+      catch (e) { throw new Error(e.code === 'invalid' ? 'Email or password is incorrect.' : e.message); }
+      const m = await this.me();
+      this.s = { email: m?.email || email }; S.profile = m?.profile || null;
+    },
+    async signOut() { try { await api('/api/auth', { method: 'POST', body: { op: 'logout' } }); } catch {} this.s = null; },
+    changePassword: (current, next) => api('/api/auth', { method: 'POST', body: { op: 'password', current, next } }),
+    async recover() { throw new Error('reset_unavailable'); },
+  };
+  const RESET_HELP = 'To reset a forgotten password, your web admin updates ADMIN_PASSWORD in Vercel (Settings → Environment Variables) and redeploys. The new password works straight away.';
 
   // ---------- data layer ----------
   const TABLES = ['leads', 'clients', 'projects', 'activities', 'tasks'];
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
-  const rest = {
-    async req(path, init = {}) {
-      const token = await auth.token();
-      const r = await fetch(`${CFG.supabaseUrl}/rest/v1/${path}`, {
-        ...init, headers: { apikey: CFG.supabaseAnonKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Prefer: 'return=representation', ...(init.headers || {}) },
-      });
-      if (r.status === 401) { auth.save(null); throw new Error('signed_out'); }
-      const j = r.status === 204 ? null : await r.json().catch(() => null);
-      if (!r.ok) throw new Error(j?.message || `Request failed (${r.status})`);
-      return j;
-    },
-    all: t => rest.req(`${t}?select=*&order=created_at.desc&limit=5000`),
-    insert: async (t, row) => (await rest.req(t, { method: 'POST', body: JSON.stringify(row) }))[0],
-    update: async (t, id, patch) => (await rest.req(`${t}?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) }))[0],
-    remove: (t, id) => rest.req(`${t}?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }),
+  const remote = {
+    async loadAll() { const j = await api('/api/data'); TABLES.forEach(t => { S[t] = j[t] || []; }); S.files = j.files || []; },
+    insert: async (t, row) => (await api('/api/data', { method: 'POST', body: { op: 'insert', table: t, row } })).row,
+    update: async (t, id, patch) => (await api('/api/data', { method: 'POST', body: { op: 'update', table: t, id, row: patch } })).row,
+    remove: (t, id) => api('/api/data', { method: 'POST', body: { op: 'delete', table: t, id } }),
   };
   const DKEY = 'jl-crm-demo-v1';
   const demo = {
@@ -197,12 +194,16 @@
     },
     reset() { this.data = seed(); this.persist(); },
   };
-  const db = DEMO ? demo : rest;
-  const S = { leads: [], clients: [], projects: [], activities: [], tasks: [], loaded: false };
-  async function loadAll() { const res = await Promise.all(TABLES.map(t => db.all(t))); TABLES.forEach((t, i) => { S[t] = res[i] || []; }); S.loaded = true; }
-  async function insert(t, row) { const r = await db.insert(t, row); S[t].unshift(r); return r; }
-  async function update(t, id, patch) { const r = await db.update(t, id, patch); const i = S[t].findIndex(x => x.id === id); if (i > -1) S[t][i] = { ...S[t][i], ...r }; return S[t][i]; }
-  async function remove(t, id) { await db.remove(t, id); if (!DEMO) await loadAll(); else TABLES.forEach(x => { S[x] = demo.data[x].slice().sort((a, b) => (a.created_at < b.created_at ? 1 : -1)); }); }
+  const db = () => (DEMO ? demo : remote);
+  const S = { leads: [], clients: [], projects: [], activities: [], tasks: [], files: [], profile: null, loaded: false };
+  async function loadAll() {
+    if (DEMO) { const res = await Promise.all(TABLES.map(t => demo.all(t))); TABLES.forEach((t, i) => { S[t] = res[i] || []; }); }
+    else await remote.loadAll();
+    S.loaded = true;
+  }
+  async function insert(t, row) { const r = await db().insert(t, row); S[t].unshift(r); return r; }
+  async function update(t, id, patch) { const r = await db().update(t, id, patch); const i = S[t].findIndex(x => x.id === id); if (i > -1) S[t][i] = { ...S[t][i], ...r }; return S[t][i]; }
+  async function remove(t, id) { await db().remove(t, id); if (!DEMO) await loadAll(); else TABLES.forEach(x => { S[x] = demo.data[x].slice().sort((a, b) => (a.created_at < b.created_at ? 1 : -1)); }); }
   const log = (body, ref, kind = 'note') => insert('activities', { kind, body, ...ref });
   const byId = (t, id) => S[t].find(x => x.id === id);
 
@@ -531,6 +532,7 @@
       </section>
       <div class="detail-side">
         <section class="card">${cardHead('tasks', 'Tasks')}${taskList({ lead_id: l.id })}</section>
+        <section class="card">${filesCard({ lead_id: l.id })}</section>
         <section class="card">${cardHead('note', 'History', 'Notes, calls & updates')}${timeline({ lead_id: l.id })}</section>
       </div>
     </div>`;
@@ -589,6 +591,7 @@
           <div class="actions-row"><button class="btn btn-danger btn-sm" type="button" data-action="del-client" data-id="${c.id}">${icon('trash')} Delete client</button></div></section>
       </div>
       <div class="detail-side">
+        <section class="card">${filesCard({ client_id: c.id }, ps)}</section>
         <section class="card">${cardHead('tasks', 'Tasks')}${taskList({ client_id: c.id })}</section>
         <section class="card">${cardHead('note', 'History', 'Notes, calls & updates')}${timeline({ client_id: c.id })}</section>
       </div>
@@ -724,9 +727,16 @@
 
   // ---------- events (delegated) ----------
   app.addEventListener('click', async e => {
-    const a = e.target.closest('[data-action],[data-leadview],[data-stagefilter],[data-projfilter],[data-toggle-table],[data-task-del],[data-step]');
+    const a = e.target.closest('[data-action],[data-leadview],[data-stagefilter],[data-projfilter],[data-toggle-table],[data-task-del],[data-step],[data-file-del]');
     if (!a) return;
     const act = a.dataset.action, id = a.dataset.id;
+    if (a.dataset.fileDel) {
+      const f = S.files.find(x => x.id === a.dataset.fileDel);
+      if (f && await confirmBox('Delete file?', `“${f.name}” will be permanently deleted.`)) {
+        try { await api(`/api/files?id=${encodeURIComponent(f.id)}`, { method: 'DELETE' }); S.files = S.files.filter(x => x.id !== f.id); toast('File deleted'); render(); } catch (err) { handleErr(err); }
+      }
+      return;
+    }
     if (a.dataset.step) { try { await changeStage(a.dataset.id, a.dataset.step); } catch (err) { handleErr(err); } return; }
     if (a.dataset.leadview) { leadView = a.dataset.leadview; history.replaceState(null, '', '#/leads'); return render(); }
     if (a.dataset.stagefilter) { leadStage = a.dataset.stagefilter; return render(); }
@@ -754,6 +764,7 @@
   });
   app.addEventListener('change', async e => {
     try {
+      if (e.target.dataset.upload) return await uploadFiles(e.target);
       const done = e.target.dataset.taskDone, st = e.target.dataset.stageOf;
       if (done) { const on = e.target.checked; await update('tasks', done, { done: on, completed_at: on ? new Date().toISOString() : null }); toast(on ? 'Task completed' : 'Task reopened'); render(); }
       if (st) await changeStage(st, e.target.value);
@@ -781,10 +792,65 @@
   });
   app.addEventListener('keydown', e => { if (e.key === 'Escape' && e.target.matches('[data-gsearch]')) { e.target.value = ''; gsearch(''); } });
   app.addEventListener('focusout', e => { if (e.target.matches('[data-gsearch]')) setTimeout(() => { if (!document.activeElement?.closest('.gsearch')) gsearch(''); }, 150); });
+
+  // ---------- files (Vercel Blob via /api/files) ----------
+  const fileUrl = (f, dl) => `/api/files?id=${encodeURIComponent(f.id)}${dl ? '&download=1' : ''}`;
+  const isImg = f => /^image\/(jpeg|png|webp|gif)$/.test(f.content_type);
+  const kb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  function filesCard(ref, projectsOfClient = []) {
+    const key = Object.keys(ref)[0];
+    const pids = projectsOfClient.map(p => p.id);
+    const list = S.files.filter(f => f[key] === ref[key] || (key === 'client_id' && pids.includes(f.project_id)));
+    const projSelect = key === 'client_id' && projectsOfClient.length
+      ? `<select class="input file-target" data-file-target aria-label="Attach to"><option value="">Attach to client</option>${projectsOfClient.map(p => `<option value="${p.id}">Project · ${esc(p.name)}</option>`).join('')}</select>` : '';
+    return `${cardHead('note', 'Files', 'Photos, plans, contracts — up to 4 MB each', '')}
+      ${DEMO ? empty('note', 'File uploads', 'Available once the CRM is connected to its database.') : `
+      <div class="file-bar">${projSelect}<label class="btn btn-ghost btn-sm file-pick">${icon('plus')} Upload<input type="file" multiple data-upload='${esc(JSON.stringify(ref))}' accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.doc,.docx,.xls,.xlsx,.txt" class="sr"></label></div>
+      <p class="upload-status" aria-live="polite"></p>
+      ${list.length ? `<div class="file-grid">${list.map(f => {
+        const proj = f.project_id && byId('projects', f.project_id);
+        return `<div class="file-tile"><a href="${fileUrl(f)}" target="_blank" rel="noopener" class="file-thumb">${isImg(f) ? `<img src="${fileUrl(f)}" alt="${esc(f.name)}" loading="lazy">` : `<span class="file-ext">${esc((f.name.split('.').pop() || 'file').slice(0, 4).toUpperCase())}</span>`}</a>
+          <div class="file-meta"><span class="t" title="${esc(f.name)}">${esc(f.name)}</span><span class="s">${kb(f.size)} · ${rel(f.created_at)}${proj ? ' · ' + esc(proj.name) : ''}</span></div>
+          <div class="file-acts"><a class="icon-btn" href="${fileUrl(f, 1)}" aria-label="Download ${esc(f.name)}">${icon('dl')}</a><button class="icon-btn" type="button" data-file-del="${f.id}" aria-label="Delete ${esc(f.name)}">${icon('trash')}</button></div></div>`;
+      }).join('')}</div>` : empty('note', 'No files yet', 'Upload inspiration photos, floor plans or contracts.')}`}`;
+  }
+  // shrink large photos in the browser before upload (keeps them under the 4 MB limit and fast to load)
+  async function shrink(file) {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size < 1.5 * 1048576) return file;
+    const bmp = await createImageBitmap(file).catch(() => null);
+    if (!bmp) return file;
+    const scale = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
+    return blob ? new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }) : file;
+  }
+  async function uploadFiles(input) {
+    const ref = JSON.parse(input.dataset.upload);
+    const target = input.closest('.card')?.querySelector('[data-file-target]')?.value;
+    const params = target ? { project_id: target } : ref;
+    const status = input.closest('.card')?.querySelector('.upload-status');
+    const files = [...input.files]; input.value = '';
+    let done = 0;
+    for (const f0 of files) {
+      if (status) status.textContent = `Uploading ${done + 1} of ${files.length}…`;
+      const f = await shrink(f0);
+      if (f.size > 4 * 1048576) { toast(`${f0.name} is over 4 MB`, true); continue; }
+      const type = f.type || 'application/octet-stream';
+      const qs = new URLSearchParams({ name: f0.name, ...params }).toString();
+      const j = await api(`/api/files?${qs}`, { method: 'POST', raw: f, type });
+      S.files.unshift(j.file); done++;
+    }
+    if (done) toast(`Uploaded ${done} file${done === 1 ? '' : 's'}`);
+    render();
+  }
+
   // ---------- account: profile, password, sign out ----------
   const PKEY = 'jl-crm-profile';
   function profile() {
-    let p = {}; try { p = JSON.parse(localStorage.getItem(PKEY) || '{}'); } catch {}
+    let p = {};
+    if (!DEMO) p = S.profile || {};
+    else { try { p = JSON.parse(localStorage.getItem(PKEY) || '{}'); } catch {} }
     return { name: p.name || 'JanLee', title: p.title || 'Owner & Lead Designer', phone: p.phone || '(719) 930-5245' };
   }
   const acctEmail = () => (DEMO ? CFG.adminEmail : auth.s?.email || CFG.adminEmail) || '';
@@ -797,9 +863,10 @@
       <div class="acct-head">${avatar(p.name, 'lg')}<div><h2>${esc(p.name)}</h2><p>${esc(p.title)}</p><p class="acct-mail">${esc(email)}</p>
         <span class="status ${DEMO ? 'status-warn' : 'status-good'}">${icon(DEMO ? 'star' : 'lock')} ${DEMO ? 'Demo mode' : 'Signed in securely'}</span></div></div>
       <p class="menu-label">Account</p>
-      <div class="menu">${item('profile', 'user', 'Profile', 'Name, title and phone')}${item('password', 'key', 'Change password', 'Update your sign-in password')}${item('reset', 'mail', 'Send password reset link', 'Emails a secure link to ' + esc(email))}</div>
+      <div class="menu">${item('profile', 'user', 'Profile', 'Name, title and phone')}${item('password', 'key', 'Change password', 'Update your sign-in password')}${item('reset', 'mail', 'Forgot password?', 'How to reset a forgotten password')}</div>
       <p class="menu-label">Shortcuts</p>
       <div class="menu">${item('export', 'dl', 'Export leads (CSV)', 'Opens in Excel or Google Sheets')}${link('/', 'site', 'View website')}${link(IG, 'ig', 'Instagram', '@interiorsbyjanlee')}${DEMO ? item('reset-demo', 'star', 'Reset demo data', 'Restore the sample data') : ''}</div>
+      ${DEMO ? '' : `<div class="menu">${item('signout-all', 'lock', 'Sign out on all devices', 'Use if a phone or laptop is lost')}</div>`}
       <div class="menu">${item('signout', 'out', 'Sign out', '', 'danger')}</div>
     </div>`);
     $$('[data-acct]', modalBody).forEach(b => b.addEventListener('click', async () => {
@@ -808,15 +875,21 @@
         if (act === 'profile') profileForm();
         else if (act === 'password') passwordForm();
         else if (act === 'reset') {
-          if (DEMO) return toast('Password reset works once the CRM is connected.', true);
-          await auth.recover(email).catch(() => {});
-          closeModal(); toast(`Reset link sent to ${email}`);
+          openModal(`<div><div class="modal-head"><h2>Forgot your password?</h2><button class="icon-btn" type="button" data-close aria-label="Close">${icon('close')}</button></div>
+            <p class="modal-sub">${esc(RESET_HELP)}</p><p class="modal-sub">If you still know your current password, use <strong>Change password</strong> instead.</p>
+            <div class="modal-foot"><button class="btn btn-ghost" type="button" data-back>Back</button><button class="btn btn-primary" type="button" data-close>Got it</button></div></div>`);
+          $('[data-back]', modalBody).onclick = accountSheet;
         }
         else if (act === 'export') { closeModal(); exportCsv(); }
         else if (act === 'reset-demo') { if (await confirmBox('Reset demo data?', 'This restores the original sample data in this browser.', 'Reset')) { demo.reset(); await loadAll(); toast('Demo data reset'); render(); } }
         else if (act === 'signout') {
           if (DEMO) return toast('There’s no account to sign out of in demo mode.', true);
           if (await confirmBox('Sign out?', 'You’ll need your password to sign back in.', 'Sign out')) { await auth.signOut(); location.hash = ''; render(); }
+        }
+        else if (act === 'signout-all') {
+          if (await confirmBox('Sign out everywhere?', 'Every phone and computer signed in to the CRM will be signed out, including this one.', 'Sign out everywhere')) {
+            await api('/api/auth', { method: 'POST', body: { op: 'logout_all' } }); auth.s = null; closeModal(); location.hash = ''; render();
+          }
         }
       } catch (err) { handleErr(err); }
     }));
@@ -832,7 +905,9 @@
       <div class="modal-foot"><button class="btn btn-ghost" type="button" data-back>Back</button><button class="btn btn-primary" type="submit">Save profile</button></div></form>`,
     async d => {
       if (!clean(d.name)) throw new Error('Please enter a display name.');
-      try { localStorage.setItem(PKEY, JSON.stringify({ name: clean(d.name), title: clean(d.title), phone: clean(d.phone) })); } catch {}
+      const p = { name: clean(d.name), title: clean(d.title), phone: clean(d.phone) };
+      if (DEMO) { try { localStorage.setItem(PKEY, JSON.stringify(p)); } catch {} }
+      else S.profile = (await api('/api/auth', { method: 'POST', body: { op: 'profile', ...p } })).profile;
       closeModal(); toast('Profile saved'); render();
     });
     $('[data-back]', modalBody).onclick = accountSheet;
@@ -928,28 +1003,9 @@
       btn.disabled = false;
     });
     $('#forgot').onclick = async () => {
-      const email = f.email.value.trim();
-      if (!email) { m.className = 'auth-msg err'; m.textContent = 'Enter your email first.'; return; }
-      try { await auth.recover(email); } catch {}
-      m.className = 'auth-msg ok'; m.textContent = 'If that email has an account, a reset link is on its way.';
+      m.className = 'auth-msg ok'; m.textContent = RESET_HELP;
     };
   }
-  function vSetPassword(token) {
-    app.innerHTML = authWrap(`<form class="auth-card form-stack" id="pw" novalidate>${brand}
-      <div><h1 class="auth-title">Set a new password</h1><p class="auth-lead">At least 10 characters.</p></div>
-      <label class="field">New password<input name="p1" type="password" autocomplete="new-password" required minlength="10"></label>
-      <label class="field">Confirm password<input name="p2" type="password" autocomplete="new-password" required minlength="10"></label>
-      <p class="auth-msg err" role="alert"></p><button class="btn btn-primary btn-block" type="submit">Save password</button>${authFoot}</form>`);
-    const f = $('#pw'), m = $('.auth-msg', f);
-    f.addEventListener('submit', async e => {
-      e.preventDefault();
-      if (f.p1.value.length < 10) { m.textContent = 'Use at least 10 characters.'; return; }
-      if (f.p1.value !== f.p2.value) { m.textContent = 'Passwords don’t match.'; return; }
-      try { await auth.call('user', { password: f.p1.value }, token); history.replaceState(null, '', '/admin/'); vLogin('Password updated — please sign in.', true); }
-      catch (err) { m.textContent = err.message; }
-    });
-  }
-
   // ---------- router ----------
   function route() {
     const [path, qs] = (location.hash.slice(2) || 'dashboard').split('?');
@@ -958,7 +1014,7 @@
   }
   let renderedKey = '', enterAnim = false;
   function render() {
-    if (!DEMO && !auth.s) return vLogin();
+    if (!DEMO && !auth.s) return vLogin('Please sign in again.');
     if (!S.loaded) { app.innerHTML = '<div class="skel-wrap" aria-label="Loading"><div class="skel h1"></div><div class="skel-row"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div><div class="skel big"></div></div>'; return; }
     const r = route();
     const views = { dashboard: vDashboard, leads: () => (r.id ? vLead(r.id) : vLeads(r.params)), tasks: vTasks, clients: () => (r.id ? vClient(r.id) : vClients()), projects: vProjects };
@@ -973,11 +1029,17 @@
   let lastRoute = '';
   addEventListener('hashchange', () => { const k = route().name + '/' + (route().id || ''); render(); if (k !== lastRoute) { scrollTo(0, 0); lastRoute = k; } });
 
+  function vSetup(missing) {
+    app.innerHTML = authWrap(`<div class="auth-card form-stack">${brand}
+      <div><h1 class="auth-title">Almost ready</h1><p class="auth-lead">The CRM is installed but a few settings still need to be added in Vercel → Settings → Environment Variables:</p></div>
+      <ul class="setup-list">${missing.map(k => `<li>${icon('key')} <code>${esc(k)}</code></li>`).join('')}</ul>
+      <p class="auth-lead">After adding them, redeploy the project and reload this page.</p>${authFoot}</div>`);
+  }
   async function boot() {
-    // password-recovery redirect from Supabase: #access_token=…&type=recovery
-    const h = new URLSearchParams(location.hash.slice(1));
-    if (!DEMO && h.get('type') === 'recovery' && h.get('access_token')) return vSetPassword(h.get('access_token'));
-    if (!DEMO && !auth.s) return vLogin();
+    const m = await auth.me();
+    if (!m) DEMO = true;                                   // no API here (local preview) → demo
+    else if (!m.configured) return vSetup(m.missing || []);
+    else { DEMO = false; if (!m.authenticated) return vLogin(); auth.s = { email: m.email }; S.profile = m.profile || null; }
     app.innerHTML = '<div class="skel-wrap" aria-label="Loading"><div class="skel h1"></div><div class="skel-row"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div><div class="skel big"></div></div>';
     try { await loadAll(); render(); }
     catch (err) { if (err.message === 'signed_out') vLogin('Please sign in again.'); else { app.innerHTML = authWrap(`<div class="auth-card form-stack">${brand}<p class="auth-msg err">Couldn’t load your data: ${esc(err.message)}</p><button class="btn btn-ghost btn-block" type="button" id="retry">Try again</button></div>`); $('#retry').onclick = boot; } }

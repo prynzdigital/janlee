@@ -1,11 +1,11 @@
 // Vercel serverless function: POST /api/lead
-// Saves a website enquiry into the CRM (Supabase) after server-side validation.
+// Saves a website enquiry into the CRM (Neon Postgres) after server-side validation.
 // Env vars (Vercel → Project → Settings → Environment Variables):
-//   SUPABASE_URL                e.g. https://abcd1234.supabase.co
-//   SUPABASE_SERVICE_ROLE_KEY   Supabase → Project Settings → API → service_role (secret! never in the browser)
-//   ALLOWED_ORIGINS             optional, comma-separated; defaults below
+//   DATABASE_URL      set automatically by the Vercel ↔ Neon integration
+//   ALLOWED_ORIGINS   optional, comma-separated; defaults below
 // The email notification + visitor auto-reply are still sent by FormSubmit from the browser.
 
+const core = require('../lib/core.js');
 const DEFAULT_ORIGINS = ['https://interiorsbyjanlee.com', 'https://www.interiorsbyjanlee.com', 'https://janlee.vercel.app'];
 const PROJECT_TYPES = ['Interior design & decorating', 'Kitchen renovation', 'Bathroom renovation', 'Whole-home remodel', 'Color consultation', 'Furniture selection / repurposing', 'Commercial space', 'Something else'];
 const hits = new Map(); // best-effort per-IP limiter (per warm instance)
@@ -39,14 +39,6 @@ function validate(b) {
   return { d, errors };
 }
 
-async function sb(path, init = {}) {
-  const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  return fetch(`${url}/rest/v1/${path}`, {
-    ...init,
-    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
-  });
-}
-
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Robots-Tag', 'noindex');
@@ -56,7 +48,7 @@ module.exports = async (req, res) => {
   const origin = req.headers.origin || '';
   if (!allowed.includes(origin)) return res.status(403).json({ ok: false, error: 'origin' });
 
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return res.status(503).json({ ok: false, error: 'not_configured' });
+  if (!process.env.DATABASE_URL) return res.status(503).json({ ok: false, error: 'not_configured' });
 
   let b = req.body;
   if (typeof b === 'string') { try { b = JSON.parse(b); } catch { b = null; } }
@@ -76,18 +68,12 @@ module.exports = async (req, res) => {
 
   try {
     // per-email: max 3 enquiries per hour (database-backed, survives cold starts)
-    const since = new Date(now - 3600e3).toISOString();
-    const c = await sb(`leads?select=id&email=eq.${encodeURIComponent(d.email)}&created_at=gte.${encodeURIComponent(since)}`, {
-      method: 'HEAD', headers: { Prefer: 'count=exact' },
-    });
-    const count = Number((c.headers.get('content-range') || '').split('/')[1] || 0);
-    if (count >= 3) return res.status(429).json({ ok: false, error: 'rate_limited' });
-
-    const r = await sb('leads', {
-      method: 'POST', headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({ ...d, zip: d.zip || null, source: 'website', stage: 'new' }),
-    });
-    if (!r.ok) { console.error('supabase insert failed', r.status, await r.text()); return res.status(502).json({ ok: false, error: 'store_failed' }); }
+    const [{ n }] = await core.q(`select count(*)::int n from leads where lower(email) = $1 and created_at > now() - interval '1 hour'`, [d.email]);
+    if (n >= 3) return res.status(429).json({ ok: false, error: 'rate_limited' });
+    const [lead] = await core.q(
+      `insert into leads (name, email, phone, zip, project_type, message, source, stage) values ($1, $2, $3, $4, $5, $6, 'website', 'new') returning id`,
+      [d.name, d.email, d.phone, d.zip || null, d.project_type, d.message]);
+    await core.q(`insert into activities (kind, body, lead_id) values ('note', 'Website enquiry received.', $1)`, [lead.id]);
     return res.status(200).json({ ok: true });
   } catch (e) {
     console.error('lead error', e);

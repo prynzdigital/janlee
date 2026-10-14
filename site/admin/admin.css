@@ -491,3 +491,25 @@ button.side-user:hover { background: rgba(255,255,255,.08); border-color: rgba(2
 .pw-meter[data-score="4"] i { background: var(--good); }
 .pw-hint { margin: -8px 0 0; font-size: .78rem; color: var(--muted); min-height: 1.1em; }
 .menu-item.danger .t { color: var(--crit); }
+
+/* ---------- files ---------- */
+.file-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.file-target { flex: 1 1 180px; width: auto; min-height: 36px; padding: 6px 12px; border-radius: 999px; }
+.file-pick { cursor: pointer; position: relative; }
+.file-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.upload-status { margin: 0 0 8px; font-size: .8rem; color: var(--muted); min-height: 1em; }
+.file-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 560px) { .file-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.file-tile { background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 12px; overflow: hidden; display: grid; min-width: 0; }
+.file-thumb { display: grid; place-items: center; aspect-ratio: 4 / 3; background: var(--surface-3); overflow: hidden; text-decoration: none; }
+.file-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .4s var(--ease); }
+.file-tile:hover .file-thumb img { transform: scale(1.04); }
+.file-ext { font: 600 .9rem/1 var(--sans); letter-spacing: .1em; color: var(--accent-ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.file-meta { padding: 8px 10px 2px; min-width: 0; }
+.file-meta .t { font-size: .84rem; }
+.file-meta .s { font-size: .72rem; }
+.file-acts { display: flex; justify-content: flex-end; padding: 0 4px 4px; }
+.file-acts .icon-btn { width: 32px; height: 32px; }
+.setup-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.setup-list li { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.setup-list code { font-size: .88rem; color: var(--ink); }

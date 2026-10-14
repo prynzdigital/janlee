@@ -25,4 +25,4 @@ Then open http://localhost:8080
 
 ## CRM (`/admin/`)
 A private dashboard for leads, tasks, clients and projects. Website enquiries are saved automatically via `api/lead.js`.
-Runs in demo mode until connected — follow **[docs/CRM-SETUP.md](docs/CRM-SETUP.md)** (Supabase, free).
+Runs on Vercel with Neon Postgres + Vercel Blob; demo mode when previewed locally. See **[docs/CRM-SETUP.md](docs/CRM-SETUP.md)**.

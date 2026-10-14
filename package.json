@@ -1,0 +1,14 @@
+{
+  "name": "interiors-by-janlee",
+  "private": true,
+  "description": "Interiors by JanLee website + CRM (static site in site/, serverless API in api/)",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build:site": "node build/build.mjs",
+    "db:migrate": "node db/migrate.mjs"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
+    "@vercel/blob": "^2.8.1"
+  }
+}
