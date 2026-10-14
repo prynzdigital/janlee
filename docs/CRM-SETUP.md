@@ -36,6 +36,22 @@ If anything is missing, `/admin/` shows an "Almost ready" screen listing exactly
 - **Forgot password:** set a new `ADMIN_PASSWORD` in Vercel and redeploy — it takes over immediately (and becomes the password until she changes it again).
 - **Lost phone / laptop:** account button → **Sign out on all devices**.
 
+## Team members
+
+The owner (`ADMIN_EMAIL`, JanLee) is always an admin and can't be removed. Admins manage everyone else in **Team & access**
+(sidebar on desktop, or account button → Team & access on a phone):
+
+| | Admin | Team member |
+|---|---|---|
+| View & edit leads, clients, projects, tasks, notes; upload files | ✅ | ✅ |
+| Delete leads, clients, projects & files · Export CSV | ✅ | ❌ |
+| Add users, change roles, reset passwords, deactivate / remove | ✅ | ❌ |
+
+- **Add team member:** name, email, role → the CRM shows a one-time temporary password (with *Copy invite message*). Share it privately; they choose their own password at first sign-in.
+- **Reset password:** Manage → Reset password issues a new temporary password and signs them out.
+- **Deactivate:** signs them out everywhere immediately and blocks sign-in (reactivate any time). **Remove** deletes the account; their notes stay in history, labelled with their name.
+- Role changes sign the person out once so the new permissions apply. All permissions are enforced by the server, not just hidden in the UI.
+
 ## Database changes
 
 `db/schema.sql` is safe to re-run. To apply it (only needed after schema edits):

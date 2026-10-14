@@ -127,3 +127,25 @@ end $$;
 -- notifications: website enquiries stay "unread" until opened in the CRM
 alter table leads add column if not exists seen_at timestamptz;
 create index if not exists leads_unseen_idx on leads (created_at desc) where seen_at is null;
+
+-- team members (the owner account, ADMIN_EMAIL, is configured in Vercel and is always an admin)
+create table if not exists users (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  email text not null check (char_length(email) between 3 and 254),
+  name text not null check (char_length(name) between 1 and 80),
+  title text check (title is null or char_length(title) <= 80),
+  phone text check (phone is null or char_length(phone) <= 30),
+  role text not null default 'staff' check (role in ('admin','staff')),
+  salt text not null,
+  hash text not null,
+  must_change boolean not null default true,
+  active boolean not null default true,
+  session_version integer not null default 1,
+  last_login_at timestamptz,
+  created_by text
+);
+create unique index if not exists users_email_uidx on users (lower(email));
+
+-- who wrote each note / call / update
+alter table activities add column if not exists author text check (author is null or char_length(author) <= 80);

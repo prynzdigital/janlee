@@ -610,3 +610,38 @@ button.side-user:hover { background: rgba(255,255,255,.08); border-color: rgba(2
 .notif-item .grow { flex: 1; min-width: 0; }
 .notif-item .t { white-space: normal; }
 .notif-item .msg { display: block; margin-top: 4px; font-size: .82rem; color: var(--text); font-style: italic; overflow-wrap: anywhere; }
+
+/* ---------- team & access ---------- */
+.role-pill { display: inline-flex; align-items: center; gap: 4px; vertical-align: 1px; margin-left: 4px; padding: 2px 9px; border-radius: 999px; font: 600 .66rem/1.5 var(--sans); letter-spacing: .05em; text-transform: uppercase; }
+.role-pill .ic { width: 11px; height: 11px; }
+.role-owner { background: var(--accent-soft); color: var(--accent-ink); }
+.role-admin { background: #E7EEF7; color: var(--st-new); }
+.role-staff { background: var(--surface-3); color: var(--muted); }
+.team-row { align-items: flex-start; }
+.team-row .t { white-space: normal; }
+.team-status { display: block; margin-top: 6px; }
+.team-acts { flex: none; }
+.team-row.is-off .avatar { filter: grayscale(1); opacity: .6; }
+.team-row.is-off .t { color: var(--muted); }
+.team-empty { margin-top: 12px; }
+.roles-card { margin-top: 16px; }
+.roles-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.roles-table th, .roles-table td { padding: 10px 8px; border-bottom: 1px solid var(--line-2); text-align: center; }
+.roles-table th { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.roles-table td:first-child, .roles-table th:first-child { text-align: left; }
+.roles-table td .ic { width: 18px; height: 18px; color: var(--good); }
+.roles-table tr:last-child td { border-bottom: 0; }
+.role-choice { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+.role-choice legend { font-size: .82rem; font-weight: 500; color: var(--ink); margin-bottom: 6px; padding: 0; }
+.role-choice label { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); cursor: pointer; transition: border-color .2s, background .2s; }
+.role-choice label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-glow); }
+.role-choice input { margin-top: 3px; accent-color: var(--ink); width: 18px; height: 18px; flex: none; }
+.role-choice strong { display: block; color: var(--ink); font-size: .92rem; }
+.role-choice small { display: block; color: var(--muted); font-size: .8rem; line-height: 1.45; margin-top: 2px; }
+.field-help { margin: -6px 0 0; font-size: .78rem; color: var(--muted); }
+.cred { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); margin-top: 10px; }
+.cred > div { min-width: 0; }
+.cred small { display: block; font-size: .72rem; color: var(--muted); letter-spacing: .04em; }
+.cred code { display: block; font: 500 .95rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--ink); overflow-wrap: anywhere; }
+.cred .temp-pw { font-size: 1.08rem; letter-spacing: .03em; color: var(--accent-ink); }
+@media (max-width: 600px) { .team-row { flex-wrap: wrap; } .team-acts { width: 100%; padding-left: 52px; } }

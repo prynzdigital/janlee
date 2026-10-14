@@ -84,7 +84,7 @@ module.exports = async (req, res) => {
     }
 
     if (req.method === 'DELETE') {
-      if (!(await core.requireAuth(req, res, { write: true }))) return;
+      if (!(await core.requireAuth(req, res, { write: true, admin: true }))) return;
       if (!UUID.test(p.get('id') || '')) return core.send(res, 400, { ok: false, error: 'bad_id' });
       const [f] = await core.q('delete from files where id = $1 returning blob_url', [p.get('id')]);
       if (f) await del(f.blob_url, core.blobAuth(req)).catch(e => console.error('blob delete', e));

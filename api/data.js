@@ -46,7 +46,7 @@ module.exports = async (req, res) => {
       return core.send(res, 200, { ok: true, leads, clients, projects, activities, tasks, files });
     }
     if (req.method !== 'POST') { res.setHeader('Allow', 'GET, POST'); return core.send(res, 405, { ok: false }); }
-    if (!(await core.requireAuth(req, res, { write: true }))) return;
+    const session = await core.requireAuth(req, res, { write: true }); if (!session) return;
 
     const { op, table, id, row } = core.body(req);
     // notifications: mark every unread lead as read
@@ -59,6 +59,7 @@ module.exports = async (req, res) => {
 
     if (op === 'insert') {
       const data = pick(table, row);
+      if (table === 'activities') data.author = String(session.name || session.email).slice(0, 80); // set by the server, never the browser
       const cols = Object.keys(data);
       if (!cols.length) return core.send(res, 400, { ok: false, error: 'empty' });
       const r = await core.q(`insert into ${table} (${cols.join(', ')}) values (${cols.map((_, i) => '$' + (i + 1)).join(', ')}) returning *`, cols.map(c => data[c]));
@@ -73,6 +74,8 @@ module.exports = async (req, res) => {
       return core.send(res, 200, { ok: true, row: r[0] });
     }
     if (op === 'delete') {
+      // team members may remove their tasks and notes, but only admins delete leads, clients or projects
+      if (['leads', 'clients', 'projects'].includes(table) && session.role !== 'admin') return core.send(res, 403, { ok: false, error: 'forbidden' });
       const blobs = await blobsFor(table, id);
       await core.q(`delete from ${table} where id = $1`, [id]);
       if (blobs.length && core.blobConfigured()) await del(blobs.map(b => b.blob_url), core.blobAuth(req)).catch(e => console.error('blob cleanup', e));

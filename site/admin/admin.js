@@ -139,6 +139,13 @@
     not_found: 'That item no longer exists.',
     same_as_temp: 'Please choose a new password, not the temporary one.',
     must_change_password: 'Please choose your own password first.',
+    forbidden: 'Only an admin can do that.',
+    email_taken: 'Someone on the team already uses that email.',
+    bad_email: 'Please enter a valid email address.',
+    name_required: 'Please enter a name.',
+    not_on_self: 'You can’t do that to your own account.',
+    too_many_users: 'The team limit (25) has been reached.',
+    same_password: 'Choose a password different from your current one.',
   };
   async function api(path, { method = 'GET', body, raw, type } = {}) {
     const r = await fetch(path, {
@@ -204,7 +211,9 @@
     reset() { this.data = seed(); this.persist(); },
   };
   const db = () => (DEMO ? demo : remote);
-  const S = { leads: [], clients: [], projects: [], activities: [], tasks: [], files: [], profile: null, loaded: false };
+  const S = { leads: [], clients: [], projects: [], activities: [], tasks: [], files: [], profile: null, loaded: false, me: null, team: null };
+  const isAdmin = () => DEMO || S.me?.role === 'admin';
+  const roleLabel = () => DEMO ? 'Demo mode' : S.me?.owner ? 'Owner' : S.me?.role === 'admin' ? 'Admin' : 'Team member';
   async function loadAll() {
     if (DEMO) { const res = await Promise.all(TABLES.map(t => demo.all(t))); TABLES.forEach((t, i) => { S[t] = res[i] || []; }); }
     else await remote.loadAll();
@@ -380,13 +389,14 @@
         <a class="side-brand" href="#/dashboard">${MARK}<span><span>Interiors by</span><strong>JanLee</strong></span></a>
         <div class="side-label">Workspace</div>
         <nav class="side-nav" aria-label="Sections">${NAV.map(link).join('')}</nav>
+        ${isAdmin() ? `<div class="side-label">Admin</div><nav class="side-nav" aria-label="Admin"><a href="#/team"${route === 'team' ? ' aria-current="page"' : ''}>${icon('clients')}<span>Team & access</span></a></nav>` : ''}
         <div class="side-links">
-          <a href="#" data-action="export">${icon('dl')} Export leads (CSV)</a>
+          ${isAdmin() ? `<a href="#" data-action="export">${icon('dl')} Export leads (CSV)</a>` : ''}
           <a href="/" target="_blank" rel="noopener">${icon('site')} View website</a>
           <a href="${esc(IG)}" target="_blank" rel="noopener">${icon('ig')} Instagram</a>
           ${DEMO ? `<a href="#" data-action="reset-demo">${icon('star')} Reset demo data</a>` : ''}
         </div>
-        <button class="side-user" type="button" data-action="account" aria-haspopup="dialog">${avatar(profile().name)}<div><strong>${esc(profile().name)}</strong><small>${who}</small></div>${icon('chev')}</button>
+        <button class="side-user" type="button" data-action="account" aria-haspopup="dialog">${avatar(profile().name)}<div><strong>${esc(profile().name)}</strong><small>${esc(roleLabel())}${DEMO ? '' : ' · ' + who}</small></div>${icon('chev')}</button>
       </aside>
       <div>
         ${DEMO ? `<div class="demo-banner">${icon('star')}<span><strong>Demo mode</strong> — sample data stored only in this browser.</span></div>` : ''}
@@ -505,7 +515,7 @@
     return `<form class="note-form" data-note='${esc(JSON.stringify(ref))}'>
         <label class="sr" for="note-body">Add a note</label><textarea class="input" id="note-body" name="body" rows="3" maxlength="5000" placeholder="Add a note, call summary or next step…" required></textarea>
         <div class="row-btns"><select class="input" name="kind" aria-label="Type">${opts(KINDS, 'note')}</select><button class="btn btn-primary btn-sm" type="submit">${icon('plus')} Add to history</button></div></form>
-      <div class="timeline">${items.map(a => `<div class="tl${a.kind === 'stage' ? ' is-stage' : ''}"><span class="tdot k-${esc(a.kind)}">${icon(KIND_IC[a.kind] || 'note')}</span><div><div class="body">${esc(a.body)}</div><div class="when">${esc((KINDS.find(k => k[0] === a.kind) || ['', a.kind === 'stage' ? 'Update' : 'Note'])[1])} · ${rel(a.created_at)}</div></div></div>`).join('') || empty('note', 'No history yet', 'Notes, calls and stage changes will appear here.')}</div>`;
+      <div class="timeline">${items.map(a => `<div class="tl${a.kind === 'stage' ? ' is-stage' : ''}"><span class="tdot k-${esc(a.kind)}">${icon(KIND_IC[a.kind] || 'note')}</span><div><div class="body">${esc(a.body)}</div><div class="when">${esc((KINDS.find(k => k[0] === a.kind) || ['', a.kind === 'stage' ? 'Update' : 'Note'])[1])} · ${rel(a.created_at)}${a.author ? ' · ' + esc(a.author) : ''}</div></div></div>`).join('') || empty('note', 'No history yet', 'Notes, calls and stage changes will appear here.')}</div>`;
   }
   function taskList(ref) {
     const key = Object.keys(ref)[0], items = S.tasks.filter(t => t[key] === ref[key]).sort((a, b) => (a.done - b.done) || String(a.due_date || '9').localeCompare(String(b.due_date || '9')));
@@ -547,7 +557,7 @@
         </dl>
         ${l.message ? `<div class="message-box">${esc(l.message)}</div>` : ''}
         <div class="actions-row">${client ? `<a class="btn btn-ghost" href="#/clients/${client.id}">${icon('clients')} View client</a>` : `<button class="btn btn-gold" type="button" data-action="convert" data-id="${l.id}">${icon('check')} Convert to client</button>`}
-          <button class="btn btn-danger" type="button" data-action="del-lead" data-id="${l.id}">${icon('trash')} Delete</button></div>
+          ${isAdmin() ? `<button class="btn btn-danger" type="button" data-action="del-lead" data-id="${l.id}">${icon('trash')} Delete</button>` : ''}</div>
       </section>
       <div class="detail-side">
         <section class="card">${cardHead('tasks', 'Tasks')}${taskList({ lead_id: l.id })}</section>
@@ -607,7 +617,7 @@
           <dl class="kv"><dt>Email</dt><dd>${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '—'}</dd><dt>Phone</dt><dd>${c.phone ? `<a href="${telHref(c.phone)}">${esc(c.phone)}</a>` : '—'}</dd><dt>Address</dt><dd>${esc(c.address || '—')}</dd>
           ${lead ? `<dt>Original lead</dt><dd><a href="#/leads/${lead.id}">${esc(lead.project_type || 'View lead')}</a></dd>` : ''}</dl>
           ${c.notes ? `<div class="message-box">${esc(c.notes)}</div>` : ''}
-          <div class="actions-row"><button class="btn btn-danger btn-sm" type="button" data-action="del-client" data-id="${c.id}">${icon('trash')} Delete client</button></div></section>
+          ${isAdmin() ? `<div class="actions-row"><button class="btn btn-danger btn-sm" type="button" data-action="del-client" data-id="${c.id}">${icon('trash')} Delete client</button></div>` : ''}</section>
       </div>
       <div class="detail-side">
         <section class="card">${filesCard({ client_id: c.id }, ps)}</section>
@@ -700,7 +710,7 @@
       <div class="grid-2"><label class="field">Budget ($)<input name="budget" inputmode="decimal" value="${esc(p.budget ?? '')}"></label><label class="field">Start date<input name="start_date" type="date" value="${esc(p.start_date || '')}"></label></div>
       <div class="grid-2"><label class="field">Target completion<input name="target_date" type="date" value="${esc(p.target_date || '')}"></label><label class="field">Completed on<input name="completed_date" type="date" value="${esc(p.completed_date || '')}"></label></div>
       <label class="field">Notes<textarea name="notes" maxlength="5000">${esc(p.notes)}</textarea></label>
-      <div class="modal-foot">${p.id ? `<button class="btn btn-danger" type="button" data-del-project="${p.id}">Delete</button><span class="spacer"></span>` : ''}<button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-primary" type="submit">${p.id ? 'Save' : 'Add project'}</button></div></form>`,
+      <div class="modal-foot">${p.id && isAdmin() ? `<button class="btn btn-danger" type="button" data-del-project="${p.id}">Delete</button><span class="spacer"></span>` : ''}<button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-primary" type="submit">${p.id ? 'Save' : 'Add project'}</button></div></form>`,
     async d => {
       if (!clean(d.name)) throw new Error('Please enter a project name.');
       const row = { name: clean(d.name), client_id: d.client_id, status: d.status, budget: num(d.budget), start_date: clean(d.start_date), target_date: clean(d.target_date), completed_date: clean(d.completed_date) || (d.status === 'completed' && !p.completed_date ? today() : null), notes: clean(d.notes) };
@@ -778,6 +788,8 @@
       else if (act === 'export') exportCsv();
       else if (act === 'account') accountSheet();
       else if (act === 'notifications') notifSheet();
+      else if (act === 'add-user') addUserForm();
+      else if (act === 'edit-user') editUserForm(id);
       else if (act === 'mark-all-seen') await markAllSeen();
       else if (act === 'signout') { await auth.signOut(); location.hash = ''; render(); }
       else if (act === 'reset-demo') { if (await confirmBox('Reset demo data?', 'This restores the original sample data in this browser.', 'Reset')) { demo.reset(); await loadAll(); toast('Demo data reset'); render(); } }
@@ -832,7 +844,7 @@
         const proj = f.project_id && byId('projects', f.project_id);
         return `<div class="file-tile"><a href="${fileUrl(f)}" target="_blank" rel="noopener" class="file-thumb">${isImg(f) ? `<img src="${fileUrl(f)}" alt="${esc(f.name)}" loading="lazy">` : `<span class="file-ext">${esc((f.name.split('.').pop() || 'file').slice(0, 4).toUpperCase())}</span>`}</a>
           <div class="file-meta"><span class="t" title="${esc(f.name)}">${esc(f.name)}</span><span class="s">${kb(f.size)} · ${rel(f.created_at)}${proj ? ' · ' + esc(proj.name) : ''}</span></div>
-          <div class="file-acts"><a class="icon-btn" href="${fileUrl(f, 1)}" aria-label="Download ${esc(f.name)}">${icon('dl')}</a><button class="icon-btn" type="button" data-file-del="${f.id}" aria-label="Delete ${esc(f.name)}">${icon('trash')}</button></div></div>`;
+          <div class="file-acts"><a class="icon-btn" href="${fileUrl(f, 1)}" aria-label="Download ${esc(f.name)}">${icon('dl')}</a>${isAdmin() ? `<button class="icon-btn" type="button" data-file-del="${f.id}" aria-label="Delete ${esc(f.name)}">${icon('trash')}</button>` : ''}</div></div>`;
       }).join('')}</div>` : empty('note', 'No files yet', 'Upload inspiration photos, floor plans or contracts.')}`}`;
   }
   // shrink large photos in the browser before upload (keeps them under the 4 MB limit and fast to load)
@@ -864,6 +876,114 @@
     }
     if (done) toast(`Uploaded ${done} file${done === 1 ? '' : 's'}`);
     render();
+  }
+
+
+  // ---------- team & access (admins) ----------
+  async function loadTeam() {
+    if (DEMO) { S.team = { owner: { email: CFG.adminEmail, name: profile().name }, users: [] }; return; }
+    S.team = await api('/api/users');
+  }
+  const ago = ts => ts ? rel(ts) : 'Never';
+  function vTeam() {
+    if (!isAdmin()) return `<div class="card">${empty('lock', 'Admins only', 'Ask an admin if you need access to team settings.')}</div>`;
+    if (!S.team) { loadTeam().then(render).catch(handleErr); return '<div class="skel-wrap"><div class="skel"></div><div class="skel big"></div></div>'; }
+    const { owner, users } = S.team;
+    const status = u => !u.active ? `<span class="status status-muted">${icon('close')} Deactivated</span>`
+      : u.must_change ? `<span class="status status-warn">${icon('clock')} Waiting for first sign-in</span>`
+      : `<span class="status status-good">${icon('check')} Active</span>`;
+    const rolePill = r => `<span class="role-pill role-${r}">${r === 'admin' ? 'Admin' : 'Team member'}</span>`;
+    return `<div class="page-head"><div><p class="eyebrow">Admin</p><h1>Team & access</h1><p>${users.length + 1} account${users.length ? 's' : ''} · admins manage the team; team members can't delete records or export</p></div>
+      <div class="head-actions"><button class="btn btn-primary" type="button" data-action="add-user">${icon('plus')} Add team member</button></div></div>
+      ${DEMO ? `<div class="auth-note">${icon('star')}<p><strong>Demo mode.</strong> Adding team members works once the CRM is connected to its database.</p></div>` : ''}
+      <div class="list team-list">
+        <div class="row team-row">${avatar(owner.name)}<span class="grow"><span class="t">${esc(owner.name)} <span class="role-pill role-owner">${icon('star')} Owner</span></span><span class="s">${esc(owner.email)}</span></span>
+          <span class="r"><span class="status status-good">${icon('lock')} Always admin</span></span></div>
+        ${users.map(u => `<div class="row team-row${u.active ? '' : ' is-off'}">${avatar(u.name)}<span class="grow"><span class="t">${esc(u.name)} ${rolePill(u.role)}</span><span class="s">${esc(u.email)} · last sign-in ${ago(u.last_login_at)}</span><span class="team-status">${status(u)}</span></span>
+          <span class="team-acts"><button class="btn btn-ghost btn-sm" type="button" data-action="edit-user" data-id="${u.id}">${icon('edit')} Manage</button></span></div>`).join('')}
+      </div>
+      ${users.length ? '' : `<div class="card team-empty">${empty('clients', 'Just you so far', 'Add an assistant, project manager or partner — they’ll get their own sign-in.')}</div>`}
+      <section class="card roles-card">${cardHead('lock', 'What each role can do')}
+        <table class="roles-table"><thead><tr><th scope="col"></th><th scope="col">Admin</th><th scope="col">Team member</th></tr></thead><tbody>
+          <tr><td>View & edit leads, clients, projects, tasks, notes</td><td>${icon('check')}</td><td>${icon('check')}</td></tr>
+          <tr><td>Upload files</td><td>${icon('check')}</td><td>${icon('check')}</td></tr>
+          <tr><td>Delete leads, clients, projects & files</td><td>${icon('check')}</td><td>—</td></tr>
+          <tr><td>Export leads (CSV)</td><td>${icon('check')}</td><td>—</td></tr>
+          <tr><td>Add users, change roles, reset passwords</td><td>${icon('check')}</td><td>—</td></tr>
+        </tbody></table></section>`;
+  }
+  const roleChoice = sel => `<fieldset class="role-choice"><legend>Role</legend>
+      <label><input type="radio" name="role" value="staff"${sel !== 'admin' ? ' checked' : ''}><span><strong>Team member</strong><small>Works with leads, clients, projects and tasks. Can’t delete records, export or manage users.</small></span></label>
+      <label><input type="radio" name="role" value="admin"${sel === 'admin' ? ' checked' : ''}><span><strong>Admin</strong><small>Full access, including deleting records and managing the team.</small></span></label></fieldset>`;
+  function showCredentials(user, temp, isReset) {
+    const url = `${location.origin}/admin/`;
+    const invite = `Hi ${user.name.split(' ')[0]},\n\n${isReset ? 'Your JanLee CRM password has been reset.' : 'You’ve been added to the JanLee Studio CRM.'}\n\nSign in at: ${url}\nEmail: ${user.email}\nTemporary password: ${temp}\n\nYou’ll be asked to create your own password right after signing in.`;
+    openModal(`<div><div class="modal-head"><h2>${isReset ? 'New temporary password' : 'Team member added'}</h2><button class="icon-btn" type="button" data-close aria-label="Close">${icon('close')}</button></div>
+      <p class="modal-sub">Share these details privately (text or in person). <strong>The password is shown only once.</strong> ${esc(user.name)} will choose their own password at first sign-in.</p>
+      <div class="cred"><div><small>Sign-in page</small><code>${esc(url)}</code></div></div>
+      <div class="cred"><div><small>Email (username)</small><code>${esc(user.email)}</code></div><button class="btn btn-ghost btn-sm" type="button" data-copy="${esc(user.email)}">Copy</button></div>
+      <div class="cred"><div><small>Temporary password</small><code class="temp-pw">${esc(temp)}</code></div><button class="btn btn-ghost btn-sm" type="button" data-copy="${esc(temp)}">Copy</button></div>
+      <div class="modal-foot"><button class="btn btn-ghost" type="button" data-copy="${esc(invite)}">${icon('mail')} Copy invite message</button><button class="btn btn-primary" type="button" data-close>Done</button></div></div>`);
+    $$('[data-copy]', modalBody).forEach(b => b.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(b.dataset.copy); const t = b.innerHTML; b.textContent = 'Copied ✓'; setTimeout(() => { b.innerHTML = t; }, 1500); }
+      catch { toast('Couldn’t copy — select the text instead', true); }
+    }));
+  }
+  function addUserForm() {
+    if (DEMO) return toast('Adding team members works once the CRM is connected.', true);
+    openModal(`<form class="form-stack" novalidate><div class="modal-head"><h2>Add team member</h2><button class="icon-btn" type="button" data-close aria-label="Close">${icon('close')}</button></div>
+      <p class="modal-sub">They’ll sign in with their email and a one-time password you share with them.</p>
+      <label class="field">Full name<input name="name" required maxlength="80" autocomplete="off"></label>
+      <label class="field">Email address<input name="email" type="email" required maxlength="254" autocomplete="off" spellcheck="false"></label>
+      ${roleChoice('staff')}
+      <div class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-primary" type="submit">${icon('plus')} Add & create password</button></div></form>`,
+    async d => {
+      if (!clean(d.name)) throw new Error('Please enter a name.');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email || '')) throw new Error('Please enter a valid email address.');
+      const j = await api('/api/users', { method: 'POST', body: { op: 'create', name: clean(d.name), email: d.email.trim(), role: d.role } });
+      S.team.users.push(j.user); render(); showCredentials(j.user, j.tempPassword, false);
+    });
+  }
+  function editUserForm(id) {
+    const u = S.team?.users.find(x => x.id === id); if (!u) return;
+    openModal(`<form class="form-stack" novalidate><div class="modal-head"><h2>${esc(u.name)}</h2><button class="icon-btn" type="button" data-close aria-label="Close">${icon('close')}</button></div>
+      <p class="modal-sub">${esc(u.email)} · added ${fmtDate(u.created_at)}${u.created_by ? ' by ' + esc(u.created_by) : ''} · last sign-in ${ago(u.last_login_at)}</p>
+      <label class="field">Full name<input name="name" required maxlength="80" value="${esc(u.name)}"></label>
+      ${roleChoice(u.role)}
+      <p class="field-help">Changing the role signs them out once so it takes effect.</p>
+      <p class="menu-label">Access</p>
+      <div class="menu">
+        <button type="button" class="menu-item" data-uact="reset">${icon('key')}<span class="mi-txt"><span class="t">Reset password</span><span class="s">Creates a new temporary password and signs them out</span></span>${icon('chev', 'ic chev')}</button>
+        <button type="button" class="menu-item" data-uact="toggle">${icon(u.active ? 'lock' : 'check')}<span class="mi-txt"><span class="t">${u.active ? 'Deactivate account' : 'Reactivate account'}</span><span class="s">${u.active ? 'Signs them out everywhere and blocks sign-in' : 'Lets them sign in again'}</span></span>${icon('chev', 'ic chev')}</button>
+        <button type="button" class="menu-item danger" data-uact="delete">${icon('trash')}<span class="mi-txt"><span class="t">Remove from team</span></span></button>
+      </div>
+      <div class="modal-foot"><button class="btn btn-ghost" type="button" data-close>Cancel</button><button class="btn btn-primary" type="submit">Save changes</button></div></form>`,
+    async d => {
+      const patch = {};
+      if (clean(d.name) && clean(d.name) !== u.name) patch.name = clean(d.name);
+      if (d.role && d.role !== u.role) patch.role = d.role;
+      if (!Object.keys(patch).length) return closeModal();
+      const j = await api('/api/users', { method: 'POST', body: { op: 'update', id: u.id, ...patch } });
+      Object.assign(u, j.user); closeModal(); toast('Team member updated'); render();
+    });
+    $$('[data-uact]', modalBody).forEach(b => b.addEventListener('click', async () => {
+      try {
+        const act = b.dataset.uact;
+        if (act === 'reset') {
+          if (!(await confirmBox('Reset password?', `${u.name} will be signed out and must sign in with a new temporary password.`, 'Reset password'))) return editUserForm(id);
+          const j = await api('/api/users', { method: 'POST', body: { op: 'reset_password', id: u.id } });
+          Object.assign(u, j.user); render(); showCredentials(u, j.tempPassword, true);
+        } else if (act === 'toggle') {
+          if (u.active && !(await confirmBox('Deactivate account?', `${u.name} will be signed out everywhere and won’t be able to sign in until reactivated.`, 'Deactivate'))) return editUserForm(id);
+          const j = await api('/api/users', { method: 'POST', body: { op: 'update', id: u.id, active: !u.active } });
+          Object.assign(u, j.user); closeModal(); toast(u.active ? 'Account reactivated' : 'Account deactivated'); render();
+        } else if (act === 'delete') {
+          if (!(await confirmBox('Remove from team?', `${u.name} will lose access permanently. Their notes stay in the history.`, 'Remove'))) return editUserForm(id);
+          await api('/api/users', { method: 'POST', body: { op: 'delete', id: u.id } });
+          S.team.users = S.team.users.filter(x => x.id !== u.id); toast('Removed from team'); render();
+        }
+      } catch (err) { handleErr(err); }
+    }));
   }
 
   // ---------- notifications ----------
@@ -942,11 +1062,12 @@
     openModal(`<div class="acct">
       <div class="acct-close"><button class="icon-btn" type="button" data-close aria-label="Close">${icon('close')}</button></div>
       <div class="acct-head">${avatar(p.name, 'lg')}<div><h2>${esc(p.name)}</h2><p>${esc(p.title)}</p><p class="acct-mail">${esc(email)}</p>
-        <span class="status ${DEMO ? 'status-warn' : 'status-good'}">${icon(DEMO ? 'star' : 'lock')} ${DEMO ? 'Demo mode' : 'Signed in securely'}</span></div></div>
+        <span class="status ${DEMO ? 'status-warn' : 'status-good'}">${icon(DEMO ? 'star' : 'lock')} ${esc(roleLabel())}${DEMO ? '' : ' · signed in securely'}</span></div></div>
       <p class="menu-label">Account</p>
       <div class="menu">${item('profile', 'user', 'Profile', 'Name, title and phone')}${item('password', 'key', 'Change password', 'Update your sign-in password')}${item('reset', 'mail', 'Forgot password?', 'How to reset a forgotten password')}</div>
+      ${isAdmin() ? `<p class="menu-label">Admin</p><div class="menu">${item('team', 'clients', 'Team & access', 'Add users, roles and passwords')}</div>` : ''}
       <p class="menu-label">Shortcuts</p>
-      <div class="menu">${item('export', 'dl', 'Export leads (CSV)', 'Opens in Excel or Google Sheets')}${link('/', 'site', 'View website')}${link(IG, 'ig', 'Instagram', '@interiorsbyjanlee')}${DEMO ? item('reset-demo', 'star', 'Reset demo data', 'Restore the sample data') : ''}</div>
+      <div class="menu">${isAdmin() ? item('export', 'dl', 'Export leads (CSV)', 'Opens in Excel or Google Sheets') : ''}${link('/', 'site', 'View website')}${link(IG, 'ig', 'Instagram', '@interiorsbyjanlee')}${DEMO ? item('reset-demo', 'star', 'Reset demo data', 'Restore the sample data') : ''}</div>
       ${DEMO ? '' : `<div class="menu">${item('signout-all', 'lock', 'Sign out on all devices', 'Use if a phone or laptop is lost')}</div>`}
       <div class="menu">${item('signout', 'out', 'Sign out', '', 'danger')}</div>
     </div>`);
@@ -954,6 +1075,7 @@
       const act = b.dataset.acct;
       try {
         if (act === 'profile') profileForm();
+        else if (act === 'team') { closeModal(); location.hash = '#/team'; }
         else if (act === 'password') passwordForm();
         else if (act === 'reset') {
           openModal(`<div><div class="modal-head"><h2>Forgot your password?</h2><button class="icon-btn" type="button" data-close aria-label="Close">${icon('close')}</button></div>
@@ -1168,19 +1290,19 @@
     if (!DEMO && !auth.s) return vLogin('You’ve been signed out.', true);
     if (!S.loaded) { app.innerHTML = '<div class="skel-wrap" aria-label="Loading"><div class="skel h1"></div><div class="skel-row"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div><div class="skel big"></div></div>'; return; }
     const r = route();
-    const views = { dashboard: vDashboard, leads: () => (r.id ? vLead(r.id) : vLeads(r.params)), tasks: vTasks, clients: () => (r.id ? vClient(r.id) : vClients()), projects: vProjects };
+    const views = { dashboard: vDashboard, leads: () => (r.id ? vLead(r.id) : vLeads(r.params)), tasks: vTasks, clients: () => (r.id ? vClient(r.id) : vClients()), projects: vProjects, team: vTeam };
     const view = views[r.name] || vDashboard;
     const active = views[r.name] ? r.name : 'dashboard';
     // play the entrance fade only when the page changes, not on data refreshes
     const key = active + '/' + (r.id || '');
     enterAnim = key !== renderedKey; renderedKey = key;
     app.innerHTML = shell(active, view());
-    document.title = `${{ dashboard: 'Dashboard', leads: r.id ? byId('leads', r.id)?.name || 'Lead' : 'Leads', tasks: 'Tasks', clients: r.id ? byId('clients', r.id)?.name || 'Client' : 'Clients', projects: 'Projects' }[active]} · JanLee CRM`;
+    document.title = `${{ dashboard: 'Dashboard', leads: r.id ? byId('leads', r.id)?.name || 'Lead' : 'Leads', tasks: 'Tasks', clients: r.id ? byId('clients', r.id)?.name || 'Client' : 'Clients', projects: 'Projects', team: 'Team & access' }[active]} · JanLee CRM`;
     refreshBadges();
     if (active === 'leads' && r.id) markSeen(r.id); // opening a request marks it as read
   }
   let lastRoute = '';
-  addEventListener('hashchange', () => { const k = route().name + '/' + (route().id || ''); render(); if (k !== lastRoute) { scrollTo(0, 0); lastRoute = k; } });
+  addEventListener('hashchange', () => { if (route().name === 'team') S.team = null; const k = route().name + '/' + (route().id || ''); render(); if (k !== lastRoute) { scrollTo(0, 0); lastRoute = k; } });
 
   function vSetup(missing) {
     app.innerHTML = authWrap(`<div class="auth-card form-stack">${brand}
@@ -1192,7 +1314,7 @@
     const m = await auth.me();
     if (!m) DEMO = true;                                   // no API here (local preview) → demo
     else if (!m.configured) return vSetup(m.missing || []);
-    else { DEMO = false; if (!m.authenticated) return vLogin(); if (m.mustChange) return vFirstPassword(); auth.s = { email: m.email }; S.profile = m.profile || null; S.filesReady = m.files !== false; }
+    else { DEMO = false; if (!m.authenticated) return vLogin(); if (m.mustChange) return vFirstPassword(); auth.s = { email: m.email }; S.me = { email: m.email, role: m.role || 'admin', owner: !!m.owner }; S.profile = m.profile || null; S.filesReady = m.files !== false; }
     app.innerHTML = '<div class="skel-wrap" aria-label="Loading"><div class="skel h1"></div><div class="skel-row"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div><div class="skel big"></div></div>';
     try { await loadAll(); render(); }
     catch (err) { if (err.message === 'signed_out') vLogin('Please sign in again.'); else { app.innerHTML = authWrap(`<div class="auth-card form-stack">${brand}<p class="auth-msg err">Couldn’t load your data: ${esc(err.message)}</p><button class="btn btn-ghost btn-block" type="button" id="retry">Try again</button></div>`); $('#retry').onclick = boot; } }
