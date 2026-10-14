@@ -181,7 +181,7 @@ function footer() {
       <a class="link-arrow link-gold" href="/contact/">Book a Consultation ${icon('arrow')}</a>
     </div>
   </div>
-  <div class="footer-bottom"><p>© ${YEAR} Interiors by JanLee. All rights reserved.</p><p><a href="/privacy/">Privacy Policy</a></p></div>
+  <div class="footer-bottom"><p>© ${YEAR} Interiors by JanLee. All rights reserved.</p><p class="footer-credit">Digital Excellence, Powered by <a href="https://www.gostatenext.com/" target="_blank" rel="noopener">StateNext Labs</a></p><p><a href="/privacy/">Privacy Policy</a></p></div>
 </div></footer>`;
 }
 
