@@ -123,3 +123,7 @@ do $$ declare t text; begin
     execute format('create trigger touch_%1$s before update on %1$s for each row execute function touch_updated_at()', t);
   end loop;
 end $$;
+
+-- notifications: website enquiries stay "unread" until opened in the CRM
+alter table leads add column if not exists seen_at timestamptz;
+create index if not exists leads_unseen_idx on leads (created_at desc) where seen_at is null;

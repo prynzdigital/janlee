@@ -5,7 +5,7 @@ const core = require('../lib/core.js');
 const { del } = require('@vercel/blob');
 
 const COLS = {
-  leads: ['name', 'email', 'phone', 'zip', 'project_type', 'message', 'source', 'stage', 'value', 'lost_reason', 'next_follow_up', 'client_id'],
+  leads: ['name', 'email', 'phone', 'zip', 'project_type', 'message', 'source', 'stage', 'value', 'lost_reason', 'next_follow_up', 'client_id', 'seen_at'],
   clients: ['name', 'email', 'phone', 'address', 'notes', 'lead_id'],
   projects: ['client_id', 'name', 'status', 'budget', 'start_date', 'target_date', 'completed_date', 'notes'],
   activities: ['kind', 'body', 'lead_id', 'client_id', 'project_id'],
@@ -49,6 +49,11 @@ module.exports = async (req, res) => {
     if (!(await core.requireAuth(req, res, { write: true }))) return;
 
     const { op, table, id, row } = core.body(req);
+    // notifications: mark every unread lead as read
+    if (op === 'mark_all_seen') {
+      const r = await core.q('update leads set seen_at = now() where seen_at is null returning id');
+      return core.send(res, 200, { ok: true, count: r.length });
+    }
     if (!TABLES.includes(table)) return core.send(res, 400, { ok: false, error: 'bad_table' });
     if (op !== 'insert' && !UUID.test(String(id))) return core.send(res, 400, { ok: false, error: 'bad_id' });
 

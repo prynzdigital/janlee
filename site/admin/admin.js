@@ -185,7 +185,7 @@
     update: async (t, id, patch) => (await api('/api/data', { method: 'POST', body: { op: 'update', table: t, id, row: patch } })).row,
     remove: (t, id) => api('/api/data', { method: 'POST', body: { op: 'delete', table: t, id } }),
   };
-  const DKEY = 'jl-crm-demo-v1';
+  const DKEY = 'jl-crm-demo-v2';
   const demo = {
     data: null,
     load() { if (this.data) return; try { this.data = JSON.parse(localStorage.getItem(DKEY) || 'null'); } catch {} if (!this.data) { this.data = seed(); this.persist(); } },
@@ -223,6 +223,7 @@
       id: uid(), created_at: ago(d), updated_at: ago(Math.max(0, d - 2)), name, email: name.toLowerCase().replace(/[^a-z]+/g, '.') + '@example.com',
       phone: `(719) 555-0${String(100 + Math.floor(d * 7) % 900).padStart(3, '0')}`, zip: '80903', project_type: type, source: src, stage, value, next_follow_up: fu,
       message: msg || `Hello JanLee — we'd love help with a ${type.toLowerCase()}. Looking to start in the next few months.`, lost_reason: stage === 'lost' ? 'Went with a lower budget option' : null, client_id: null,
+      seen_at: d <= 3 && src === 'website' ? null : ago(Math.max(0, d - 1)),
     });
     const leads = [
       L('Avery Collins', 1, 'new', 'Kitchen renovation', 45000, 'website', inDays(0), 'Our kitchen is from the 90s and we want something warm and timeless — sage cabinets maybe? Budget is flexible for the right design.'),
@@ -330,6 +331,8 @@
   // ---------- derived data ----------
   const monthKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
   const openTasks = () => S.tasks.filter(t => !t.done);
+  // notifications: leads (mostly website enquiries) not opened yet
+  const unread = () => S.leads.filter(l => !l.seen_at).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   const dueCount = () => openTasks().filter(t => t.due_date && t.due_date <= today()).length
     + S.leads.filter(l => OPEN.includes(l.stage) && l.next_follow_up && l.next_follow_up <= today()).length;
   const refName = r => {
@@ -368,8 +371,9 @@
 
   const NAV = [['dashboard', 'Dashboard', 'dash'], ['leads', 'Leads', 'leads'], ['tasks', 'Tasks', 'tasks'], ['clients', 'Clients', 'clients'], ['projects', 'Projects', 'projects']];
   function shell(route, inner) {
-    const due = dueCount();
-    const link = ([id, label, ic]) => `<a href="#/${id}"${route === id ? ' aria-current="page"' : ''}>${icon(ic)}<span>${label}</span>${id === 'tasks' && due ? `<b class="badge" aria-label="${due} due">${due}</b>` : ''}</a>`;
+    const due = dueCount(), news = unread().length;
+    const badge = { leads: news ? `<b class="badge" aria-label="${news} new">${news > 99 ? '99+' : news}</b>` : '', tasks: due ? `<b class="badge" aria-label="${due} due">${due}</b>` : '' };
+    const link = ([id, label, ic]) => `<a href="#/${id}"${route === id ? ' aria-current="page"' : ''}>${icon(ic)}<span>${label}</span>${badge[id] || ''}</a>`;
     const who = DEMO ? 'Demo mode' : esc(auth.s?.email || '');
     return `<div class="shell">
       <aside class="sidenav" aria-label="CRM">
@@ -391,6 +395,7 @@
           <div class="gsearch" role="search">${icon('search')}<input class="input" type="search" data-gsearch placeholder="Search leads & clients…" aria-label="Search leads and clients" autocomplete="off"><div class="gresults" hidden></div></div>
           <span class="spacer"></span>
           <a class="icon-btn m-only" href="${esc(IG)}" target="_blank" rel="noopener" aria-label="Instagram (opens in a new tab)">${icon('ig')}</a>
+          <button class="icon-btn bell-btn${news ? ' has-new' : ''}" type="button" data-action="notifications" aria-haspopup="dialog" aria-label="Notifications${news ? `, ${news} new` : ''}">${icon('bell')}${news ? `<b class="badge">${news > 99 ? '99+' : news}</b>` : ''}</button>
           <button class="btn btn-primary btn-sm" type="button" data-action="new-lead">${icon('plus')} Lead</button>
           <button class="account-btn" type="button" data-action="account" aria-haspopup="dialog" aria-label="Account: profile, password and sign out">${avatar(profile().name)}</button>
         </header>
@@ -433,6 +438,11 @@
         <p>${summary}</p>
         <div class="head-actions"><button class="btn btn-gold" type="button" data-action="new-lead">${icon('plus')} New lead</button><button class="btn btn-glass" type="button" data-action="new-task">${icon('tasks')} Add task</button><a class="btn btn-glass hide-sm" href="#/leads">${icon('leads')} Pipeline</a></div>
       </section>
+    ${unread().length ? `<section class="card notif-card" aria-labelledby="h-new">
+        <div class="card-head"><div class="card-title"><span class="chip-ic pulse">${icon('bell')}</span><div><h2 id="h-new">${unread().length} new request${unread().length === 1 ? '' : 's'}</h2><p>From your website — reply soon to win the project</p></div></div><button class="linklike" type="button" data-action="mark-all-seen">Mark all as read</button></div>
+        <div class="today-list">${unread().slice(0, 4).map(l => `<a class="today-item" href="#/leads/${l.id}">${avatar(l.name)}<span class="grow"><span class="t">${esc(l.name)} <span class="new-chip">New</span></span><span class="s">${esc(l.project_type || 'Enquiry')} · ${rel(l.created_at)}${l.message ? ' · “' + esc(l.message.slice(0, 70)) + (l.message.length > 70 ? '…' : '') + '”' : ''}</span></span>${icon('chev', 'ic chev')}</a>`).join('')}</div>
+        ${unread().length > 4 ? `<p class="more-new"><button class="linklike" type="button" data-action="notifications">See all ${unread().length} new requests</button></p>` : ''}
+      </section>` : ''}
     <section class="stats" aria-label="Key numbers">
       ${tile('New leads this month', 'leads', thisM, `<div class="stat-delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : ''}">${delta === 0 ? 'Same as last month' : `${delta > 0 ? '▲' : '▼'} ${Math.abs(delta)} vs last month`}</div>`, spark(perMonth.map(r => r.value)))}
       ${tile('Open pipeline', 'money', compact(openVal), `<div class="stat-delta">${open.length} open lead${open.length === 1 ? '' : 's'}</div>`)}
@@ -456,7 +466,7 @@
     </div>`;
   }
   const leadRow = l => `<a class="row" href="#/leads/${l.id}">${avatar(l.name)}
-    <span class="grow"><span class="t">${esc(l.name)}</span><span class="s">${esc(l.project_type || '—')} · ${esc(srcLabel(l.source))} · ${rel(l.created_at)}</span></span>
+    <span class="grow"><span class="t">${esc(l.name)}${!l.seen_at ? ' <span class="new-chip">New</span>' : ''}</span><span class="s">${esc(l.project_type || '—')} · ${esc(srcLabel(l.source))} · ${rel(l.created_at)}</span></span>
     <span class="r">${stagePill(l.stage)}<small>${l.value ? money(l.value) : ''}</small></span></a>`;
 
   let leadView = 'board', leadQuery = '', leadStage = 'all';
@@ -477,7 +487,7 @@
         return `<section class="col col-${s.id}" data-drop="${s.id}" aria-label="${s.label}"><div class="col-head"><h2><span class="dot dot-${s.id}"></span>${s.label}</h2><span class="count">${ls.length}</span></div>
           <div class="col-sum">${v ? compact(v) + ' value' : ''}</div>
           ${ls.map(l => `<a class="lead-card" href="#/leads/${l.id}" data-lead="${l.id}"${fine ? ' draggable="true"' : ''}>
-            <span class="lc-top">${avatar(l.name)}<span><span class="n">${esc(l.name)}</span><span class="p">${esc(l.project_type || '—')}</span></span></span>
+            <span class="lc-top">${avatar(l.name)}<span><span class="n">${!l.seen_at ? '<span class="new-dot" aria-label="New"></span>' : ''}${esc(l.name)}</span><span class="p">${esc(l.project_type || '—')}</span></span></span>
             <span class="lc-foot">${l.value ? `<span class="v">${money(l.value)}</span>` : '<span class="v"></span>'}${OPEN.includes(l.stage) && l.next_follow_up ? dueBadge(l.next_follow_up) : `<span>${rel(l.created_at)}</span>`}</span></a>`).join('') || `<div class="empty">${fine ? 'Drag a lead here' : 'No leads'}</div>`}
         </section>`;
       }).join('')}</div>`;
@@ -661,7 +671,7 @@
         if (row.stage !== l.stage) await log(`Stage changed: ${stageLabel(l.stage)} → ${stageLabel(row.stage)}`, { lead_id: l.id }, 'stage');
         await update('leads', l.id, row); toast('Lead saved');
       } else {
-        const n = await insert('leads', row); await log('Lead added manually.', { lead_id: n.id }); toast('Lead added'); location.hash = `#/leads/${n.id}`;
+        const n = await insert('leads', { ...row, seen_at: new Date().toISOString() }); await log('Lead added manually.', { lead_id: n.id }); toast('Lead added'); location.hash = `#/leads/${n.id}`;
       }
       closeModal(); render();
     });
@@ -767,6 +777,8 @@
       else if (act === 'new-task') taskForm();
       else if (act === 'export') exportCsv();
       else if (act === 'account') accountSheet();
+      else if (act === 'notifications') notifSheet();
+      else if (act === 'mark-all-seen') await markAllSeen();
       else if (act === 'signout') { await auth.signOut(); location.hash = ''; render(); }
       else if (act === 'reset-demo') { if (await confirmBox('Reset demo data?', 'This restores the original sample data in this browser.', 'Reset')) { demo.reset(); await loadAll(); toast('Demo data reset'); render(); } }
     } catch (err) { handleErr(err); }
@@ -853,6 +865,66 @@
     if (done) toast(`Uploaded ${done} file${done === 1 ? '' : 's'}`);
     render();
   }
+
+  // ---------- notifications ----------
+  async function markAllSeen() {
+    if (!unread().length) return;
+    const now = new Date().toISOString();
+    if (DEMO) { for (const l of unread()) await update('leads', l.id, { seen_at: now }); }
+    else { await api('/api/data', { method: 'POST', body: { op: 'mark_all_seen', table: 'leads', id: '00000000-0000-0000-0000-000000000000' } }); S.leads.forEach(l => { if (!l.seen_at) l.seen_at = now; }); }
+    closeModal(); toast('All caught up'); render();
+  }
+  async function markSeen(id) {
+    const l = byId('leads', id);
+    if (!l || l.seen_at) return;
+    try { await update('leads', id, { seen_at: new Date().toISOString() }); refreshBadges(); } catch {}
+  }
+  function notifSheet() {
+    const news = unread(), recent = S.leads.filter(l => l.seen_at && l.source === 'website').slice(0, 5);
+    const item = (l, isNew) => `<a class="notif-item${isNew ? ' is-new' : ''}" href="#/leads/${l.id}" data-close>${avatar(l.name)}<span class="grow"><span class="t">${esc(l.name)}${isNew ? ' <span class="new-chip">New</span>' : ''}</span><span class="s">${esc(l.project_type || 'Enquiry')} · ${rel(l.created_at)}</span>${l.message ? `<span class="msg">“${esc(l.message.slice(0, 110))}${l.message.length > 110 ? '…' : ''}”</span>` : ''}</span></a>`;
+    openModal(`<div class="notif">
+      <div class="modal-head"><h2>Notifications</h2><button class="icon-btn" type="button" data-close aria-label="Close">${icon('close')}</button></div>
+      ${news.length ? `<div class="notif-bar"><span>${news.length} new request${news.length === 1 ? '' : 's'}</span><button class="linklike" type="button" data-mark-all>Mark all as read</button></div><div class="menu">${news.map(l => item(l, true)).join('')}</div>`
+        : empty('check', 'You’re all caught up', 'New website requests will appear here.', 'good')}
+      ${recent.length ? `<p class="menu-label">Earlier</p><div class="menu">${recent.map(l => item(l, false)).join('')}</div>` : ''}
+    </div>`);
+    const b = $('[data-mark-all]', modalBody); if (b) b.onclick = () => markAllSeen().catch(handleErr);
+  }
+  // update counters in place (no full re-render, so nothing typed is lost)
+  function refreshBadges() {
+    const n = unread().length;
+    const label = n > 99 ? '99+' : String(n);
+    $$('.side-nav a[href="#/leads"], .tabbar a[href="#/leads"]').forEach(a => {
+      let b = a.querySelector('.badge');
+      if (!n) { b?.remove(); return; }
+      if (!b) { b = document.createElement('b'); b.className = 'badge'; a.appendChild(b); }
+      b.textContent = label; b.setAttribute('aria-label', `${n} new`);
+    });
+    const bell = $('.bell-btn');
+    if (bell) {
+      bell.classList.toggle('has-new', !!n);
+      bell.setAttribute('aria-label', `Notifications${n ? `, ${n} new` : ''}`);
+      let b = bell.querySelector('.badge');
+      if (!n) b?.remove(); else { if (!b) { b = document.createElement('b'); b.className = 'badge'; bell.appendChild(b); } b.textContent = label; }
+    }
+    document.title = document.title.replace(/^\(\d+\+?\)\s*/, '');
+    if (n) document.title = `(${label}) ${document.title}`;
+    try { n ? navigator.setAppBadge?.(n) : navigator.clearAppBadge?.(); } catch {}
+  }
+  // check for new website requests every minute while the CRM is open
+  let pollBusy = false;
+  setInterval(async () => {
+    if (DEMO || pollBusy || document.hidden || !S.loaded || !auth.s) return;
+    pollBusy = true;
+    try {
+      const before = new Set(S.leads.map(l => l.id));
+      await loadAll();
+      const fresh = unread().filter(l => !before.has(l.id));
+      if (fresh.length) toast(fresh.length === 1 ? `New request from ${fresh[0].name}` : `${fresh.length} new requests`);
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '') || modal.open;
+      if (fresh.length && !typing) render(); else refreshBadges();
+    } catch {} finally { pollBusy = false; }
+  }, 60000);
 
   // ---------- account: profile, password, sign out ----------
   const PKEY = 'jl-crm-profile';
@@ -1104,6 +1176,8 @@
     enterAnim = key !== renderedKey; renderedKey = key;
     app.innerHTML = shell(active, view());
     document.title = `${{ dashboard: 'Dashboard', leads: r.id ? byId('leads', r.id)?.name || 'Lead' : 'Leads', tasks: 'Tasks', clients: r.id ? byId('clients', r.id)?.name || 'Client' : 'Clients', projects: 'Projects' }[active]} · JanLee CRM`;
+    refreshBadges();
+    if (active === 'leads' && r.id) markSeen(r.id); // opening a request marks it as read
   }
   let lastRoute = '';
   addEventListener('hashchange', () => { const k = route().name + '/' + (route().id || ''); render(); if (k !== lastRoute) { scrollTo(0, 0); lastRoute = k; } });
