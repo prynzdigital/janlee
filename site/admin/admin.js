@@ -46,6 +46,9 @@
     chev: '<path d="m12 8 8 8-8 8"/>',
     user: '<circle cx="16" cy="11" r="6"/><path d="M5 28c1.5-6 6-9 11-9s9.5 3 11 9"/>',
     key: '<circle cx="10" cy="20" r="6"/><path d="m14.5 15.5 11-11M21 9l3 3M18 12l3 3"/>',
+    eye: '<path d="M2 16s5-9 14-9 14 9 14 9-5 9-14 9S2 16 2 16Z"/><circle cx="16" cy="16" r="4"/>',
+    eyeoff: '<path d="M4 4l24 24M13 8.4A13 13 0 0 1 16 8c9 0 14 8 14 8a24 24 0 0 1-4 4.6M8 9.6C4.4 12 2 16 2 16s5 8 14 8a13 13 0 0 0 5.4-1.2"/><path d="M13.2 13.2a4 4 0 0 0 5.6 5.6"/>',
+    arrowR: '<path d="M6 16h20M19 9l7 7-7 7"/>',
     search: '<circle cx="14" cy="14" r="9"/><path d="m21 21 7 7"/>',
     list: '<path d="M11 8h16M11 16h16M11 24h16M5 8h.01M5 16h.01M5 24h.01"/>',
     money: '<rect x="3" y="8" width="26" height="16" rx="3"/><circle cx="16" cy="16" r="3.5"/><path d="M7 12v.01M25 20v.01"/>',
@@ -134,6 +137,8 @@
     origin: 'Security check failed — please reload the page.',
     not_configured: 'The CRM isn’t fully set up yet.',
     not_found: 'That item no longer exists.',
+    same_as_temp: 'Please choose a new password, not the temporary one.',
+    must_change_password: 'Please choose your own password first.',
   };
   async function api(path, { method = 'GET', body, raw, type } = {}) {
     const r = await fetch(path, {
@@ -143,7 +148,7 @@
     });
     const j = await r.json().catch(() => ({}));
     if (r.status === 401 && j.error === 'signed_out') { auth.s = null; throw Object.assign(new Error('signed_out'), { code: 'signed_out' }); }
-    if (!r.ok || j.ok === false) throw Object.assign(new Error(ERR[j.error] || `Request failed (${r.status})`), { code: j.error });
+    if (!r.ok || j.ok === false) throw Object.assign(new Error(ERR[j.error] || `Request failed (${r.status})`), { code: j.error, data: j });
     return j;
   }
   const auth = {
@@ -155,9 +160,13 @@
         return await r.json();
       } catch { return null; }
     },
-    async signIn(email, password) {
-      try { await api('/api/auth', { method: 'POST', body: { op: 'login', email, password } }); }
-      catch (e) { throw new Error(e.code === 'invalid' ? 'Email or password is incorrect.' : e.message); }
+    async signIn(email, password, remember = true) {
+      try { await api('/api/auth', { method: 'POST', body: { op: 'login', email, password, remember } }); }
+      catch (e) {
+        if (e.code !== 'invalid') throw e;
+        const left = e.data?.remaining;
+        throw new Error(`Email or password is incorrect.${left != null && left <= 2 ? ` ${left === 0 ? 'Sign-in is now paused for 15 minutes.' : `${left} attempt${left === 1 ? '' : 's'} left before a 15-minute pause.`}` : ''}`);
+      }
       const m = await this.me();
       this.s = { email: m?.email || email }; S.profile = m?.profile || null;
     },
@@ -976,35 +985,105 @@
 
   // ---------- auth views ----------
   const brand = `<div class="brand">${MARK}<span class="brand-sub">Interiors by</span><span class="brand-name">JanLee</span><span class="brand-tag">Studio CRM</span></div>`;
-  const authWrap = inner => `<div class="auth"><div class="auth-photo"><img src="/assets/img/projects/emerald-and-indigo-mosaic-bath/cover-lg.webp" alt="" width="1600" height="1066"><div class="quote"><p>“Restoring the old while embracing the new.”</p><span>Interiors by JanLee · Colorado Springs</span></div></div><div class="auth-side">${inner}</div></div>`;
-  const authFoot = `<p class="auth-foot">${icon('lock')} Private, encrypted access for Interiors by JanLee</p>`;
+  const FEATURES = [
+    ['leads', 'Every enquiry, captured', 'Website requests arrive in your pipeline automatically.'],
+    ['bell', 'Never miss a follow-up', 'Tasks and reminders for what’s due today.'],
+    ['projects', 'Clients & projects', 'Budgets, timelines and history in one place.'],
+    ['lock', 'Private & secure', 'Encrypted sign-in and private file storage.'],
+  ];
+  const authWrap = (inner, { features = true } = {}) => `<div class="auth">
+    <aside class="auth-photo"><img src="/assets/img/projects/emerald-and-indigo-mosaic-bath/cover-lg.webp" alt="" width="1600" height="1066">
+      <div class="auth-photo-in">
+        <a class="auth-site" href="/">${MARK}<span><small>Interiors by</small>JanLee</span></a>
+        <div class="auth-pitch"><p class="eyebrow">Studio CRM</p><h2>Your studio, beautifully organized.</h2>
+          ${features ? `<ul class="auth-features">${FEATURES.map(([ic, t, d]) => `<li><span class="af-ic">${icon(ic)}</span><span><strong>${t}</strong><small>${d}</small></span></li>`).join('')}</ul>` : ''}
+        </div>
+        <p class="auth-quote">“Restoring the old while embracing the new.”</p>
+      </div></aside>
+    <div class="auth-side">${inner}</div></div>`;
+  const authFoot = `<div class="auth-foot"><span>${icon('lock')} Encrypted connection · private to Interiors by JanLee</span><a href="/">${icon('back')} Back to website</a></div>`;
+  const pwToggle = name => `<button class="pw-eye" type="button" data-eye="${name}" aria-label="Show password" aria-pressed="false">${icon('eye')}</button>`;
+  function wireEyes(root) {
+    $$('[data-eye]', root).forEach(b => b.addEventListener('click', () => {
+      const inp = root.elements[b.dataset.eye], show = inp.type === 'password';
+      inp.type = show ? 'text' : 'password'; b.setAttribute('aria-pressed', String(show)); b.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      b.innerHTML = icon(show ? 'eyeoff' : 'eye'); inp.focus();
+    }));
+  }
+  function capsWarn(input, el) {
+    const f = e => { el.hidden = !(e.getModifierState && e.getModifierState('CapsLock')); };
+    input.addEventListener('keydown', f); input.addEventListener('keyup', f); input.addEventListener('blur', () => { el.hidden = true; });
+  }
   function vLogin(msg = '', ok = false) {
+    const h = new Date().getHours(), hello = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
     app.innerHTML = authWrap(`<form class="auth-card form-stack" id="login" novalidate>${brand}
-      <div><h1 class="auth-title">Welcome back</h1><p class="auth-lead">Sign in to your studio dashboard.</p></div>
-      <label class="field">Email<input name="email" type="email" autocomplete="username" required value="${esc(CFG.adminEmail || '')}"></label>
-      <label class="field">Password<input name="password" type="password" autocomplete="current-password" required minlength="8"></label>
+      <div><h1 class="auth-title">${hello}</h1><p class="auth-lead">Sign in to manage leads, clients and projects.</p></div>
+      <label class="field"><span class="lbl-row">Email address <small>your username</small></span>
+        <span class="input-ic">${icon('mail')}<input name="email" type="email" inputmode="email" autocomplete="username" spellcheck="false" required value="${esc(CFG.adminEmail || '')}"></span></label>
+      <label class="field">Password
+        <span class="input-ic">${icon('key')}<input name="password" type="password" autocomplete="current-password" required>${pwToggle('password')}</span></label>
+      <p class="caps" hidden>${icon('alert')} Caps Lock is on</p>
+      <div class="auth-row"><label class="check-row"><input type="checkbox" name="remember" checked> Keep me signed in</label><button class="linklike" type="button" id="forgot">Forgot password?</button></div>
       <p class="auth-msg ${ok ? 'ok' : 'err'}" role="alert">${esc(msg)}</p>
-      <button class="btn btn-primary btn-block" type="submit">Sign in</button>
-      <p class="auth-alt"><button class="linklike" type="button" id="forgot">Forgot password?</button></p>${authFoot}</form>`);
-    const f = $('#login'), m = $('.auth-msg', f);
-    let fails = 0;
+      <button class="btn btn-primary btn-block btn-lg" type="submit"><span class="btn-label">Sign in</span>${icon('arrowR')}</button>
+      <div class="auth-note">${icon('star')}<p><strong>First time signing in?</strong> Use the temporary password from your web admin. You’ll create your own password right after.</p></div>
+      ${authFoot}</form>`);
+    const f = $('#login'), m = $('.auth-msg', f), btn = $('button[type=submit]', f);
+    wireEyes(f); capsWarn(f.password, $('.caps', f));
+    setTimeout(() => (f.email.value ? f.password : f.email).focus(), 50);
     f.addEventListener('submit', async e => {
       e.preventDefault();
-      const d = Object.fromEntries(new FormData(f)), btn = $('button[type=submit]', f);
-      if (!d.email || !d.password) { m.className = 'auth-msg err'; m.textContent = 'Enter your email and password.'; return; }
-      btn.disabled = true; m.textContent = '';
-      try { await auth.signIn(d.email.trim(), d.password); await boot(); }
+      const email = f.email.value.trim(), password = f.password.value;
+      if (!email || !password) { m.className = 'auth-msg err'; m.textContent = 'Enter your email and password.'; (email ? f.password : f.email).focus(); return; }
+      btn.disabled = true; btn.classList.add('is-busy'); $('.btn-label', btn).textContent = 'Signing in…'; m.textContent = '';
+      try { await auth.signIn(email, password, f.remember.checked); await boot(); return; }
       catch (err) {
-        fails++; m.className = 'auth-msg err';
-        m.textContent = /invalid/i.test(err.message) ? 'Email or password is incorrect.' : err.message;
-        // slow down repeated guesses in this tab (Supabase also rate-limits server-side)
-        if (fails >= 3) { btn.textContent = 'Please wait…'; setTimeout(() => { btn.disabled = false; btn.textContent = 'Sign in'; }, 2000 * fails); return; }
+        m.className = 'auth-msg err'; m.textContent = err.message;
+        f.password.value = ''; f.password.focus();
+        f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake');
       }
-      btn.disabled = false;
+      btn.disabled = false; btn.classList.remove('is-busy'); $('.btn-label', btn).textContent = 'Sign in';
     });
-    $('#forgot').onclick = async () => {
-      m.className = 'auth-msg ok'; m.textContent = RESET_HELP;
-    };
+    $('#forgot').onclick = () => { m.className = 'auth-msg ok'; m.textContent = RESET_HELP; };
+  }
+  function pwScore(v) {
+    const checks = [v.length >= 12, /[a-z]/.test(v) && /[A-Z]/.test(v), /\d/.test(v), /[^A-Za-z0-9]/.test(v) || v.length >= 16];
+    return { checks, score: v.length < 12 ? (v ? 1 : 0) : checks.filter(Boolean).length };
+  }
+  function vFirstPassword() {
+    app.innerHTML = authWrap(`<form class="auth-card form-stack" id="firstpw" novalidate>${brand}
+      <div><p class="eyebrow">Step 2 of 2</p><h1 class="auth-title">Create your password</h1><p class="auth-lead">You signed in with a temporary password. Choose your own to open your dashboard — it replaces the temporary one.</p></div>
+      <label class="field">New password<span class="input-ic">${icon('key')}<input name="p1" type="password" autocomplete="new-password" required minlength="12">${pwToggle('p1')}</span></label>
+      <div class="pw-meter" data-score="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <ul class="pw-rules" aria-live="polite">
+        <li data-rule="0">${icon('check')} At least 12 characters</li><li data-rule="1">${icon('check')} Upper & lower case letters</li>
+        <li data-rule="2">${icon('check')} At least one number</li><li data-rule="3">${icon('check')} A symbol (or 16+ characters)</li></ul>
+      <label class="field">Confirm password<span class="input-ic">${icon('key')}<input name="p2" type="password" autocomplete="new-password" required minlength="12">${pwToggle('p2')}</span></label>
+      <p class="caps" hidden>${icon('alert')} Caps Lock is on</p>
+      <p class="auth-msg err" role="alert"></p>
+      <button class="btn btn-primary btn-block btn-lg" type="submit"><span class="btn-label">Save & open dashboard</span>${icon('arrowR')}</button>
+      <p class="auth-alt"><button class="linklike" type="button" id="cancel-first">Cancel and sign out</button></p>
+      ${authFoot}</form>`, { features: false });
+    const f = $('#firstpw'), m = $('.auth-msg', f), btn = $('button[type=submit]', f), meter = $('.pw-meter', f);
+    wireEyes(f); capsWarn(f.p1, $('.caps', f));
+    setTimeout(() => f.p1.focus(), 50);
+    f.p1.addEventListener('input', () => {
+      const { checks, score } = pwScore(f.p1.value);
+      meter.dataset.score = score;
+      $$('[data-rule]', f).forEach(li => li.classList.toggle('ok', checks[+li.dataset.rule]));
+    });
+    f.addEventListener('submit', async e => {
+      e.preventDefault();
+      const a = f.p1.value, b = f.p2.value, { score } = pwScore(a);
+      if (a.length < 12) { m.textContent = 'Use at least 12 characters.'; return f.p1.focus(); }
+      if (score < 3) { m.textContent = 'Make it a little stronger — tick at least three of the boxes above.'; return f.p1.focus(); }
+      if (a !== b) { m.textContent = 'Passwords don’t match.'; return f.p2.focus(); }
+      btn.disabled = true; $('.btn-label', btn).textContent = 'Saving…'; m.textContent = '';
+      try { await api('/api/auth', { method: 'POST', body: { op: 'password', next: a } }); toast('Password created — welcome!'); await boot(); return; }
+      catch (err) { if (err.code === 'signed_out') return vLogin('Your temporary sign-in expired. Please sign in again.'); m.textContent = err.message; }
+      btn.disabled = false; $('.btn-label', btn).textContent = 'Save & open dashboard';
+    });
+    $('#cancel-first').onclick = async () => { await auth.signOut(); vLogin('Signed out.', true); };
   }
   // ---------- router ----------
   function route() {
@@ -1014,7 +1093,7 @@
   }
   let renderedKey = '', enterAnim = false;
   function render() {
-    if (!DEMO && !auth.s) return vLogin('Please sign in again.');
+    if (!DEMO && !auth.s) return vLogin('You’ve been signed out.', true);
     if (!S.loaded) { app.innerHTML = '<div class="skel-wrap" aria-label="Loading"><div class="skel h1"></div><div class="skel-row"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div><div class="skel big"></div></div>'; return; }
     const r = route();
     const views = { dashboard: vDashboard, leads: () => (r.id ? vLead(r.id) : vLeads(r.params)), tasks: vTasks, clients: () => (r.id ? vClient(r.id) : vClients()), projects: vProjects };
@@ -1039,7 +1118,7 @@
     const m = await auth.me();
     if (!m) DEMO = true;                                   // no API here (local preview) → demo
     else if (!m.configured) return vSetup(m.missing || []);
-    else { DEMO = false; if (!m.authenticated) return vLogin(); auth.s = { email: m.email }; S.profile = m.profile || null; }
+    else { DEMO = false; if (!m.authenticated) return vLogin(); if (m.mustChange) return vFirstPassword(); auth.s = { email: m.email }; S.profile = m.profile || null; }
     app.innerHTML = '<div class="skel-wrap" aria-label="Loading"><div class="skel h1"></div><div class="skel-row"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div><div class="skel big"></div></div>';
     try { await loadAll(); render(); }
     catch (err) { if (err.message === 'signed_out') vLogin('Please sign in again.'); else { app.innerHTML = authWrap(`<div class="auth-card form-stack">${brand}<p class="auth-msg err">Couldn’t load your data: ${esc(err.message)}</p><button class="btn btn-ghost btn-block" type="button" id="retry">Try again</button></div>`); $('#retry').onclick = boot; } }
