@@ -5,7 +5,10 @@
 //   ALLOWED_ORIGINS   optional, comma-separated; defaults below
 // The email notification + visitor auto-reply are still sent by FormSubmit from the browser.
 
+const crypto = require('node:crypto');
 const core = require('../lib/core.js');
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const sha = s => crypto.createHash('sha256').update(String(s)).digest('hex');
 const DEFAULT_ORIGINS = ['https://interiorsbyjanlee.com', 'https://www.interiorsbyjanlee.com', 'https://janlee.vercel.app'];
 const PROJECT_TYPES = ['Interior design & decorating', 'Kitchen renovation', 'Bathroom renovation', 'Whole-home remodel', 'Color consultation', 'Furniture selection / repurposing', 'Commercial space', 'Something else'];
 const hits = new Map(); // best-effort per-IP limiter (per warm instance)
@@ -54,6 +57,17 @@ module.exports = async (req, res) => {
   if (typeof b === 'string') { try { b = JSON.parse(b); } catch { b = null; } }
   if (!b || typeof b !== 'object' || JSON.stringify(b).length > 10000) return res.status(400).json({ ok: false, error: 'bad_request' });
 
+  // the thank-you page (reached only after FormSubmit's robot check) confirms the email went out
+  if (b.op === 'confirm') {
+    if (!UUID.test(String(b.id)) || !/^[0-9a-f]{48}$/.test(String(b.token))) return res.status(200).json({ ok: true });
+    try {
+      const r = await core.q(`update leads set email_confirmed_at = now(), email_token_hash = null
+        where id = $1 and email_token_hash = $2 and created_at > now() - interval '3 hours' returning id`, [b.id, sha(b.token)]);
+      if (r.length) await core.q(`insert into activities (kind, body, lead_id) values ('note', 'Email sent — the visitor completed the website form (FormSubmit).', $1)`, [b.id]);
+    } catch (e) { console.error('confirm error', e); }
+    return res.status(200).json({ ok: true });
+  }
+
   // bots: honeypot filled → pretend success, store nothing
   if (b._honey) return res.status(200).json({ ok: true });
 
@@ -70,11 +84,12 @@ module.exports = async (req, res) => {
     // per-email: max 3 enquiries per hour (database-backed, survives cold starts)
     const [{ n }] = await core.q(`select count(*)::int n from leads where lower(email) = $1 and created_at > now() - interval '1 hour'`, [d.email]);
     if (n >= 3) return res.status(429).json({ ok: false, error: 'rate_limited' });
+    const token = crypto.randomBytes(24).toString('hex'); // one-time code for the email confirmation above
     const [lead] = await core.q(
-      `insert into leads (name, email, phone, zip, project_type, message, source, stage) values ($1, $2, $3, $4, $5, $6, 'website', 'new') returning id`,
-      [d.name, d.email, d.phone, d.zip || null, d.project_type, d.message]);
+      `insert into leads (name, email, phone, zip, project_type, message, source, stage, email_token_hash) values ($1, $2, $3, $4, $5, $6, 'website', 'new', $7) returning id`,
+      [d.name, d.email, d.phone, d.zip || null, d.project_type, d.message, sha(token)]);
     await core.q(`insert into activities (kind, body, lead_id) values ('note', 'Website enquiry received.', $1)`, [lead.id]);
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({ ok: true, id: lead.id, token });
   } catch (e) {
     console.error('lead error', e);
     return res.status(500).json({ ok: false, error: 'server' });

@@ -645,3 +645,6 @@ button.side-user:hover { background: rgba(255,255,255,.08); border-color: rgba(2
 .cred code { display: block; font: 500 .95rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--ink); overflow-wrap: anywhere; }
 .cred .temp-pw { font-size: 1.08rem; letter-spacing: .03em; color: var(--accent-ink); }
 @media (max-width: 600px) { .team-row { flex-wrap: wrap; } .team-acts { width: 100%; padding-left: 52px; } }
+.email-status { margin-top: 10px; }
+.email-status.sm { display: block; margin: 4px 0 2px; }
+.email-status .status { white-space: normal; text-align: left; }

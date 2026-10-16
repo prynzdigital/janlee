@@ -362,7 +362,20 @@ ${ctaBand()}`;
   const a = bySlug['calming-sophistication'], b = bySlug['stunning-statements'];
   const body = `
 ${pageHero('About Us', 'Our World-Class Team in Colorado Springs', `Since ${site.founded}, Interiors by JanLee has partnered with homeowners to transform existing spaces through thoughtful design, remodeling and custom renovation.`, [['/', 'Home'], ['/about/', 'About']], 'kissing-camels-chalet')}
-<section class="section"><div class="wrap split">
+<section class="section meet" aria-labelledby="meet-h"><div class="wrap meet-grid">
+  <figure class="meet-photo reveal">
+    <img src="/assets/img/about/janlee-sm.webp" srcset="/assets/img/about/janlee-sm.webp 600w, /assets/img/about/janlee.webp 1000w" sizes="(min-width: 1024px) 40vw, 90vw" width="600" height="800" alt="JanLee at home in a light-filled living room with colorful art, flowers and plants" loading="lazy" decoding="async">
+  </figure>
+  <div class="meet-copy reveal">
+    <p class="eyebrow">Meet the Designer</p>
+    <h2 class="h2" id="meet-h">Meet JanLee</h2>
+    <p class="meet-role">Founder &amp; Lead Designer · Colorado Springs · since ${site.founded}</p>
+    <p class="meet-lead">JanLee’s heart is happiest when she’s surrounded by the people she loves, sharing heartfelt conversations in beautiful, peaceful places.</p>
+    <p>Outside of design, writing is one of her passions — and she finds her best words flowing to the gentle sound of water. She’s a dreamer who loves turning her visions into plans and seeing them through.</p>
+    <div class="btn-row"><a class="btn btn-dark" href="/contact/">Work with JanLee ${icon('arrow')}</a><a class="btn btn-outline" href="${site.instagram}" target="_blank" rel="noopener">${icon('instagram')} Follow along</a></div>
+  </div>
+</div></section>
+<section class="section section-tint"><div class="wrap split">
   <div class="split-media reveal">${img(a, 1, { sizes: '(min-width: 1024px) 45vw, 100vw', cls: 'split-img' })}</div>
   <div class="split-copy prose reveal">
     <p class="eyebrow">Our Story</p>
@@ -371,7 +384,7 @@ ${pageHero('About Us', 'Our World-Class Team in Colorado Springs', `Since ${site
     <p>I have a love for mixing colors, styles and patterns to create something stunning. Our passion is blending classic and contemporary elements while preserving the character of your home.</p>
   </div>
 </div></section>
-<section class="section section-tint"><div class="wrap split split-rev">
+<section class="section"><div class="wrap split split-rev">
   <div class="split-media reveal">${img(b, 0, { sizes: '(min-width: 1024px) 45vw, 100vw', cls: 'split-img' })}</div>
   <div class="split-copy prose reveal">
     <p class="eyebrow">Full-Service Design</p>

@@ -43,7 +43,9 @@ module.exports = async (req, res) => {
         ...TABLES.map(t => core.q(`select * from ${t} order by created_at desc limit 5000`)),
         core.q(`select ${FILE_COLS} from files order by created_at desc limit 5000`),
       ]);
-      return core.send(res, 200, { ok: true, leads, clients, projects, activities, tasks, files });
+      // never send the confirmation hash to the browser — just whether the email step is still pending
+      const safeLeads = leads.map(({ email_token_hash, ...l }) => ({ ...l, email_pending: !!email_token_hash }));
+      return core.send(res, 200, { ok: true, leads: safeLeads, clients, projects, activities, tasks, files });
     }
     if (req.method !== 'POST') { res.setHeader('Allow', 'GET, POST'); return core.send(res, 405, { ok: false }); }
     const session = await core.requireAuth(req, res, { write: true }); if (!session) return;

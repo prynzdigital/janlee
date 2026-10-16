@@ -149,3 +149,7 @@ create unique index if not exists users_email_uidx on users (lower(email));
 
 -- who wrote each note / call / update
 alter table activities add column if not exists author text check (author is null or char_length(author) <= 80);
+
+-- did the visitor finish the FormSubmit step (robot check) so the email went out?
+alter table leads add column if not exists email_token_hash text;
+alter table leads add column if not exists email_confirmed_at timestamptz;

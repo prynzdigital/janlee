@@ -134,6 +134,18 @@
     });
   }
 
+  // Thank-you page: visitors only land here after FormSubmit's robot check, i.e. the email was sent.
+  // Tell the CRM so the lead shows "Email sent" instead of "robot check not finished".
+  if (location.pathname.startsWith('/thank-you')) {
+    try {
+      const c = JSON.parse(sessionStorage.getItem('jl-lead-confirm') || 'null');
+      if (c && c.id && c.token) {
+        fetch('/api/lead', { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true, credentials: 'omit', body: JSON.stringify({ op: 'confirm', id: c.id, token: c.token }) }).catch(() => {});
+        sessionStorage.removeItem('jl-lead-confirm');
+      }
+    } catch {}
+  }
+
   // Contact form — client-side validation + anti-spam before a standard POST to FormSubmit. FormSubmit has no server-side rules,
   // so these checks stop honest mistakes and casual bots; the hidden _blacklist and honeypot help on their side.
   const form = $('#contact-form');
@@ -266,6 +278,9 @@ ${raw.message}`;
             zip: form.elements.zip.value, project: form.elements.project.value, message: form.elements.message.value,
             consent: form.elements.consent.checked, _honey: form.elements._honey.value,
           }),
+        }).then(r => r.json()).then(j => {
+          // remember the one-time code so the thank-you page can confirm the email step was completed
+          if (j && j.id && j.token) { try { sessionStorage.setItem('jl-lead-confirm', JSON.stringify({ id: j.id, token: j.token })); } catch {} }
         }).catch(() => {});
         clearTimeout(t);
       } catch {}

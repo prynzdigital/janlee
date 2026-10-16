@@ -341,6 +341,15 @@
   const monthKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
   const openTasks = () => S.tasks.filter(t => !t.done);
   // notifications: leads (mostly website enquiries) not opened yet
+  // did FormSubmit email this website enquiry? (visitor must finish the robot check)
+  function emailStatus(l) {
+    if (l.source !== 'website') return '';
+    if (l.email_confirmed_at) return `<span class="status status-good">${icon('mail')} Email sent</span>`;
+    if (!l.email_pending) return '';
+    return (Date.now() - new Date(l.created_at)) / 60000 < 15
+      ? `<span class="status status-muted">${icon('clock')} Waiting for robot check</span>`
+      : `<span class="status status-warn" title="The visitor didn’t finish FormSubmit’s robot check, so no email or confirmation was sent. Reply from the CRM.">${icon('alert')} No email sent · robot check not finished</span>`;
+  }
   const unread = () => S.leads.filter(l => !l.seen_at).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   const dueCount = () => openTasks().filter(t => t.due_date && t.due_date <= today()).length
     + S.leads.filter(l => OPEN.includes(l.stage) && l.next_follow_up && l.next_follow_up <= today()).length;
@@ -450,7 +459,7 @@
       </section>
     ${unread().length ? `<section class="card notif-card" aria-labelledby="h-new">
         <div class="card-head"><div class="card-title"><span class="chip-ic pulse">${icon('bell')}</span><div><h2 id="h-new">${unread().length} new request${unread().length === 1 ? '' : 's'}</h2><p>From your website — reply soon to win the project</p></div></div><button class="linklike" type="button" data-action="mark-all-seen">Mark all as read</button></div>
-        <div class="today-list">${unread().slice(0, 4).map(l => `<a class="today-item" href="#/leads/${l.id}">${avatar(l.name)}<span class="grow"><span class="t">${esc(l.name)} <span class="new-chip">New</span></span><span class="s">${esc(l.project_type || 'Enquiry')} · ${rel(l.created_at)}${l.message ? ' · “' + esc(l.message.slice(0, 70)) + (l.message.length > 70 ? '…' : '') + '”' : ''}</span></span>${icon('chev', 'ic chev')}</a>`).join('')}</div>
+        <div class="today-list">${unread().slice(0, 4).map(l => `<a class="today-item" href="#/leads/${l.id}">${avatar(l.name)}<span class="grow"><span class="t">${esc(l.name)} <span class="new-chip">New</span></span>${emailStatus(l).includes('No email') ? `<span class="email-status sm">${emailStatus(l)}</span>` : ''}<span class="s">${esc(l.project_type || 'Enquiry')} · ${rel(l.created_at)}${l.message ? ' · “' + esc(l.message.slice(0, 70)) + (l.message.length > 70 ? '…' : '') + '”' : ''}</span></span>${icon('chev', 'ic chev')}</a>`).join('')}</div>
         ${unread().length > 4 ? `<p class="more-new"><button class="linklike" type="button" data-action="notifications">See all ${unread().length} new requests</button></p>` : ''}
       </section>` : ''}
     <section class="stats" aria-label="Key numbers">
@@ -541,7 +550,7 @@
     const client = l.client_id && byId('clients', l.client_id);
     return `<a class="back" href="#/leads">${icon('back')} Leads</a>
     <section class="profile"><div class="profile-in">${avatar(l.name)}
-      <div class="profile-txt"><h1>${esc(l.name)}</h1><div class="meta"><span>${icon('star')} ${esc(l.project_type || 'Lead')}</span><span>${icon('money')} ${money(l.value)}</span><span>${icon('clock')} Added ${rel(l.created_at)}</span><span>${icon('site')} ${esc(srcLabel(l.source))}</span></div></div>
+      <div class="profile-txt"><h1>${esc(l.name)}</h1><div class="meta"><span>${icon('star')} ${esc(l.project_type || 'Lead')}</span><span>${icon('money')} ${money(l.value)}</span><span>${icon('clock')} Added ${rel(l.created_at)}</span><span>${icon('site')} ${esc(srcLabel(l.source))}</span></div>${emailStatus(l) ? `<div class="email-status">${emailStatus(l)}</div>` : ''}</div>
       <div class="head-actions">${l.phone ? `<a class="btn btn-ghost btn-sm" href="${telHref(l.phone)}">${icon('phone')} Call</a>` : ''}${l.email ? `<a class="btn btn-ghost btn-sm" href="mailto:${esc(l.email)}">${icon('mail')} Email</a>` : ''}<button class="btn btn-ghost btn-sm" type="button" data-action="edit-lead" data-id="${l.id}">${icon('edit')} Edit</button></div>
     </div>${stepper(l)}</section>
     <div class="detail">
@@ -1001,7 +1010,7 @@
   }
   function notifSheet() {
     const news = unread(), recent = S.leads.filter(l => l.seen_at && l.source === 'website').slice(0, 5);
-    const item = (l, isNew) => `<a class="notif-item${isNew ? ' is-new' : ''}" href="#/leads/${l.id}" data-close>${avatar(l.name)}<span class="grow"><span class="t">${esc(l.name)}${isNew ? ' <span class="new-chip">New</span>' : ''}</span><span class="s">${esc(l.project_type || 'Enquiry')} · ${rel(l.created_at)}</span>${l.message ? `<span class="msg">“${esc(l.message.slice(0, 110))}${l.message.length > 110 ? '…' : ''}”</span>` : ''}</span></a>`;
+    const item = (l, isNew) => `<a class="notif-item${isNew ? ' is-new' : ''}" href="#/leads/${l.id}" data-close>${avatar(l.name)}<span class="grow"><span class="t">${esc(l.name)}${isNew ? ' <span class="new-chip">New</span>' : ''}</span><span class="s">${esc(l.project_type || 'Enquiry')} · ${rel(l.created_at)}</span>${emailStatus(l) ? `<span class="email-status sm">${emailStatus(l)}</span>` : ''}${l.message ? `<span class="msg">“${esc(l.message.slice(0, 110))}${l.message.length > 110 ? '…' : ''}”</span>` : ''}</span></a>`;
     openModal(`<div class="notif">
       <div class="modal-head"><h2>Notifications</h2><button class="icon-btn" type="button" data-close aria-label="Close">${icon('close')}</button></div>
       ${news.length ? `<div class="notif-bar"><span>${news.length} new request${news.length === 1 ? '' : 's'}</span><button class="linklike" type="button" data-mark-all>Mark all as read</button></div><div class="menu">${news.map(l => item(l, true)).join('')}</div>`

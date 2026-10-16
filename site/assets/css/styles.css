@@ -653,3 +653,13 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .footer-credit a { color: #E3C48F; font-weight: 500; }
 .footer-credit a:hover { color: #fff; text-decoration: underline; }
 @media (max-width: 639px) { .footer-bottom { flex-direction: column; align-items: flex-start; gap: 6px; } }
+
+/* ---------- About: Meet JanLee ---------- */
+.meet-grid { display: grid; gap: 40px; align-items: center; }
+.meet-photo { position: relative; margin: 0 auto; width: min(100%, 440px); }
+.meet-photo::before { content: ''; position: absolute; inset: 18px -18px -18px 18px; border: 1px solid var(--gold); border-radius: 220px 220px var(--radius) var(--radius); opacity: .6; }
+.meet-photo img { position: relative; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; object-position: 50% 60%; border-radius: 220px 220px var(--radius) var(--radius); box-shadow: var(--shadow-lg); }
+.meet-role { font-size: .82rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: -4px 0 22px; }
+.meet-lead { font: italic 500 clamp(1.35rem, 3vw, 1.7rem)/1.4 var(--serif); color: var(--ink); margin-bottom: 1.1rem; }
+.meet-copy > p:not(.eyebrow):not(.meet-role):not(.meet-lead) { color: var(--text); font-size: 1.06rem; margin-bottom: 1.8rem; }
+@media (min-width: 1024px) { .meet-grid { grid-template-columns: .9fr 1.1fr; gap: 88px; } .meet-photo { width: 100%; max-width: 460px; } }
